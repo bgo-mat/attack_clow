@@ -310,8 +310,8 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 8192,
-          "maxTokens": 8192
+          "contextWindow": 131072,
+          "maxTokens": 16384
         },
         {
           "id": "dolphin-llama3:70b",
@@ -319,8 +319,8 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 8192,
-          "maxTokens": 8192
+          "contextWindow": 131072,
+          "maxTokens": 16384
         }
       ]
     }
