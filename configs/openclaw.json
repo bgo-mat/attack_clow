@@ -4,9 +4,9 @@
   },
   "auth": {
     "profiles": {
-      "ollama:default": {
-        "provider": "ollama",
-        "mode": "none"
+      "openrouter:default": {
+        "provider": "openrouter",
+        "mode": "api_key"
       }
     }
   },
@@ -18,7 +18,7 @@
       },
       "models": {
         "spectre": {
-          "alias": "Spectre (dolphin-llama3.1:70b uncensored)"
+          "alias": "Spectre (dolphin-llama3:70b uncensored)"
         }
       },
       "workspace": "/root/.openclaw/workspace",
@@ -62,12 +62,6 @@
     "tailscale": {
       "mode": "off",
       "resetOnExit": false
-    }
-  },
-  "providers": {
-    "ollama": {
-      "baseUrl": "http://127.0.0.1:11434/v1",
-      "api": "openai-completions"
     }
   }
 }

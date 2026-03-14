@@ -2,9 +2,8 @@
 # =============================================================
 # Attack Claw — Spectre Pentest Agent — Automated Installation
 # =============================================================
-# Usage: git clone ... && cd attack_clow && chmod +x install.sh && ./install.sh
-#
-# Requirements: Debian/Ubuntu server with GPU, root access
+# Compatible with: VPS (systemd) and Docker containers (no systemd)
+# Requirements: Debian/Ubuntu, root access, GPU recommended
 # =============================================================
 
 set -e
@@ -22,6 +21,12 @@ info() { echo -e "${CYAN}[*]${NC} $1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Detect if we have systemd
+HAS_SYSTEMD=false
+if pidof systemd &>/dev/null || [ -d /run/systemd/system ]; then
+    HAS_SYSTEMD=true
+fi
+
 # =============================================================
 # PRE-CHECKS
 # =============================================================
@@ -34,6 +39,12 @@ echo "========================================="
 echo "  SPECTRE — Attack Claw Setup"
 echo "========================================="
 echo ""
+
+if [ "$HAS_SYSTEMD" = true ]; then
+    info "Detected: systemd environment (VPS/VM)"
+else
+    info "Detected: container environment (no systemd)"
+fi
 
 # Interactive: ask for dashboard password
 read -s -p "[?] Choose a dashboard password: " DASHBOARD_PASSWORD
@@ -151,8 +162,21 @@ log "Configuring Tor..."
 cp "$SCRIPT_DIR/configs/tor/torrc" /etc/tor/torrc
 mkdir -p /var/log/tor
 chown debian-tor:debian-tor /var/log/tor 2>/dev/null || true
-systemctl enable tor 2>/dev/null || true
-systemctl restart tor@default 2>/dev/null || systemctl restart tor 2>/dev/null || warn "Tor start failed — may need manual config"
+
+if [ "$HAS_SYSTEMD" = true ]; then
+    systemctl enable tor 2>/dev/null || true
+    systemctl restart tor@default 2>/dev/null || systemctl restart tor 2>/dev/null || warn "Tor systemd start failed"
+else
+    # Container mode: start Tor directly
+    pkill tor 2>/dev/null || true
+    tor &
+    sleep 3
+    if ss -tlnp | grep -q ":9050 "; then
+        log "Tor started (direct mode)"
+    else
+        warn "Tor may not have started — run 'tor &' manually"
+    fi
+fi
 log "Tor configured"
 
 # =============================================================
@@ -170,13 +194,15 @@ if ! command -v ollama &>/dev/null; then
     curl -fsSL https://ollama.ai/install.sh | sh
 fi
 
-# Start Ollama service
-systemctl enable ollama 2>/dev/null || true
-systemctl start ollama 2>/dev/null || true
+# Start Ollama
+if [ "$HAS_SYSTEMD" = true ]; then
+    systemctl enable ollama 2>/dev/null || true
+    systemctl start ollama 2>/dev/null || true
+fi
 
-# Wait for Ollama to be ready
+# Wait for Ollama to be ready (or start manually)
 info "Waiting for Ollama API..."
-for i in $(seq 1 30); do
+for i in $(seq 1 15); do
     if curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
         break
     fi
@@ -184,12 +210,17 @@ for i in $(seq 1 30); do
 done
 
 if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
-    # Ollama might not have systemd — start manually in background
+    # No systemd or service failed — start manually
+    info "Starting Ollama manually..."
     ollama serve &>/dev/null &
     sleep 5
 fi
 
-log "Ollama running"
+if curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
+    log "Ollama running"
+else
+    warn "Ollama API not responding — run 'ollama serve &' manually"
+fi
 
 # Pull the uncensored model
 info "Pulling dolphin-llama3:70b (this will take a while ~40GB)..."
@@ -205,7 +236,7 @@ log "Spectre model created"
 
 # Quick test
 info "Testing model..."
-RESPONSE=$(curl -s http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null)
+RESPONSE=$(curl -s --max-time 120 http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null)
 if echo "$RESPONSE" | grep -qi "ready"; then
     log "Model test passed"
 else
@@ -241,8 +272,35 @@ sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
 
 cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json
 
-# Run onboard to initialize
+# Initialize OpenClaw and configure Ollama provider via CLI
 openclaw onboard --accept-risk 2>/dev/null || true
+openclaw doctor --fix 2>/dev/null || true
+
+# Configure Ollama as the model provider
+# OpenClaw needs models scanned/registered — we register via the agent models config
+mkdir -p /root/.openclaw/agents/main/agent
+cat > /root/.openclaw/agents/main/agent/models.json << MODELJSON
+{
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "api": "openai-completions",
+      "models": [
+        {
+          "id": "spectre",
+          "name": "Spectre (dolphin-llama3:70b uncensored)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+          "contextWindow": 8192,
+          "maxTokens": 4096
+        }
+      ],
+      "apiKey": "ollama"
+    }
+  }
+}
+MODELJSON
 
 log "OpenClaw workspace deployed"
 
@@ -260,31 +318,46 @@ openssl req -x509 -newkey rsa:4096 -sha256 -days 3650 -nodes \
     -subj "/CN=$VPS_IP" \
     -addext "subjectAltName=IP:$VPS_IP" 2>/dev/null
 
-chown caddy:caddy "$CERT_DIR"/*.pem 2>/dev/null || true
-chmod 640 "$CERT_DIR"/*.pem
+chown caddy:caddy "$CERT_DIR"/*.pem 2>/dev/null || chmod 644 "$CERT_DIR"/*.pem
+chmod 640 "$CERT_DIR"/*.pem 2>/dev/null || true
 
 # Deploy Caddyfile with token
 cp "$SCRIPT_DIR/configs/caddy/Caddyfile" /etc/caddy/Caddyfile
 sed -i "s/__TOKEN__/$GATEWAY_TOKEN/g" /etc/caddy/Caddyfile
 
-systemctl enable caddy 2>/dev/null || true
-systemctl restart caddy
+if [ "$HAS_SYSTEMD" = true ]; then
+    systemctl enable caddy 2>/dev/null || true
+    systemctl restart caddy
+else
+    # Container mode: start Caddy directly
+    caddy stop 2>/dev/null || true
+    caddy start --config /etc/caddy/Caddyfile
+fi
 log "Caddy HTTPS configured for $VPS_IP"
 
 # =============================================================
-# 12. OPENCLAW GATEWAY SERVICE
+# 12. OPENCLAW GATEWAY
 # =============================================================
-log "Setting up OpenClaw gateway service..."
+log "Starting OpenClaw gateway..."
 
-mkdir -p /root/.config/systemd/user
-cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/
-
-loginctl enable-linger root 2>/dev/null || true
-
-export XDG_RUNTIME_DIR=/run/user/0
-systemctl --user daemon-reload
-systemctl --user enable openclaw-gateway
-systemctl --user start openclaw-gateway
+if [ "$HAS_SYSTEMD" = true ]; then
+    mkdir -p /root/.config/systemd/user
+    cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/
+    loginctl enable-linger root 2>/dev/null || true
+    export XDG_RUNTIME_DIR=/run/user/0
+    systemctl --user daemon-reload
+    systemctl --user enable openclaw-gateway
+    systemctl --user start openclaw-gateway
+else
+    # Container mode: start gateway directly in background
+    openclaw gateway --port 18790 &>/dev/null &
+    sleep 3
+    if curl -s http://127.0.0.1:18790 &>/dev/null; then
+        log "OpenClaw gateway running (direct mode)"
+    else
+        warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
+    fi
+fi
 
 log "OpenClaw gateway started"
 
@@ -313,6 +386,61 @@ chmod +x /usr/local/bin/start
 log "Claude CLI installed — run 'claude /login' to authenticate, then 'start' to launch with context"
 
 # =============================================================
+# 14. STARTUP SCRIPT (for containers without systemd)
+# =============================================================
+if [ "$HAS_SYSTEMD" = false ]; then
+    cat > /usr/local/bin/spectre-start-all << 'ALLEOF'
+#!/bin/bash
+# Start all Spectre services (for containers without systemd)
+echo "[*] Starting Spectre services..."
+
+# Tor
+if ! pgrep -x tor &>/dev/null; then
+    tor &
+    sleep 3
+    echo "[+] Tor started"
+else
+    echo "[+] Tor already running"
+fi
+
+# Ollama
+if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
+    ollama serve &>/dev/null &
+    sleep 5
+    echo "[+] Ollama started"
+else
+    echo "[+] Ollama already running"
+fi
+
+# Caddy
+if ! pgrep -x caddy &>/dev/null; then
+    caddy start --config /etc/caddy/Caddyfile
+    echo "[+] Caddy started"
+else
+    echo "[+] Caddy already running"
+fi
+
+# OpenClaw Gateway
+if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
+    openclaw gateway --port 18790 &>/dev/null &
+    sleep 3
+    echo "[+] OpenClaw gateway started"
+else
+    echo "[+] OpenClaw gateway already running"
+fi
+
+VPS_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
+echo ""
+echo "========================================="
+echo "  All services running"
+echo "  Dashboard: https://$VPS_IP/"
+echo "========================================="
+ALLEOF
+    chmod +x /usr/local/bin/spectre-start-all
+    log "Created 'spectre-start-all' command for container restarts"
+fi
+
+# =============================================================
 # DONE
 # =============================================================
 echo ""
@@ -323,7 +451,7 @@ echo ""
 echo "  Server IP:     $VPS_IP"
 echo "  Dashboard:     https://$VPS_IP/"
 echo "  Password:      (the one you entered)"
-echo "  Model:         spectre (dolphin-llama3.1:70b uncensored)"
+echo "  Model:         spectre (dolphin-llama3:70b uncensored)"
 echo "  Ollama API:    http://127.0.0.1:11434"
 echo ""
 echo "  Next steps:"
@@ -334,8 +462,9 @@ echo "  4. Enter your password to connect"
 echo "  5. Approve device: openclaw devices list && openclaw devices approve <id>"
 echo ""
 echo "  Commands:"
-echo "  - start           → Launch Claude CLI with full Spectre context"
-echo "  - ollama list     → Show installed models"
-echo "  - scripts/opsec-check.sh → Verify OPSEC"
+echo "  - start              → Launch Claude CLI with full Spectre context"
+echo "  - spectre-start-all  → Restart all services (container mode)"
+echo "  - ollama list        → Show installed models"
+echo "  - opsec-check.sh     → Verify OPSEC"
 echo ""
 echo "========================================="
