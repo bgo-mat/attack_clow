@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "socket": {},
+  "defaults": {},
+  "agents": {
+    "*": {
+      "allowlist": [
+        {
+          "pattern": "/usr/bin/*",
+          "lastUsedAt": 1773499404947,
+          "id": "a7c44259-a5bd-4c6d-80d6-f04ae9eea6f1"
+        },
+        {
+          "pattern": "/usr/sbin/*",
+          "lastUsedAt": 1773499408430,
+          "id": "ec572ffc-2bfa-486e-9397-c3e092c2048b"
+        },
+        {
+          "pattern": "/usr/local/bin/*",
+          "lastUsedAt": 1773499411904,
+          "id": "94cc330c-9fca-4201-a731-d6c390c88806"
+        },
+        {
+          "pattern": "/opt/*",
+          "lastUsedAt": 1773499415300,
+          "id": "e7c50ca9-2973-4cd8-ad52-7862ebde0f02"
+        },
+        {
+          "pattern": "/root/.openclaw/workspace/scripts/*",
+          "lastUsedAt": 1773499418828
+        }
+      ]
+    }
+  }
+}

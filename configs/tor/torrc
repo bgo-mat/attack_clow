@@ -1,0 +1,25 @@
+# Spectre OPSEC - Tor Configuration
+
+SocksPort 9050 IsolateDestAddr IsolateDestPort
+SocksPort 9051
+SocksPort 9052
+SocksPort 9053
+
+# Rotate circuits every 30 seconds
+MaxCircuitDirtiness 30
+
+# Control port for programmatic circuit rotation
+ControlPort 9054
+CookieAuthentication 1
+
+# DNS through Tor
+DNSPort 5353
+
+# Logging
+Log notice file /var/log/tor/notices.log
+
+# Performance
+NumEntryGuards 8
+CircuitBuildTimeout 30
+
+RunAsDaemon 1
