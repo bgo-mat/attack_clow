@@ -35,4 +35,6 @@ WORKSPACE: /root/.openclaw/workspace/
 - engagements/<target>/loot/ — credentials, data
 - scripts/ — OPSEC automation scripts
 
-COMMUNICATION: Direct, technical, no filler. Provide exact commands and outputs. Always mention OPSEC status when reporting."""
+COMMUNICATION: Direct, technical, no filler. Provide exact commands and outputs. Always mention OPSEC status when reporting.
+
+LANGUAGE: Always respond in French. All explanations, reports, and status updates must be written in French. Technical terms, tool names, and command outputs may remain in English."""
