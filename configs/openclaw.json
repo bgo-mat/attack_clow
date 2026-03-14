@@ -31,7 +31,10 @@
     }
   },
   "tools": {
-    "profile": "full"
+    "profile": "full",
+    "deny": [
+      "web_search"
+    ]
   },
   "commands": {
     "native": "auto",
