@@ -1,8 +1,20 @@
 FROM dolphin-llama3:70b
 
 PARAMETER temperature 0.7
-PARAMETER num_ctx 131072
+PARAMETER num_ctx 32768
 PARAMETER top_p 0.9
+
+TEMPLATE """{{- if .System }}<|start_header_id|>system<|end_header_id|>
+
+{{ .System }}<|eot_id|>{{- end }}
+{{- range .Messages }}<|start_header_id|>{{ .Role }}<|end_header_id|>
+
+{{ .Content }}{{- if .ToolCalls }}
+{{- range .ToolCalls }}<|python_tag|>{"name": "{{ .Function.Name }}", "parameters": {{ .Function.Arguments }}}{{- end }}
+{{- end }}<|eot_id|>
+{{- end }}<|start_header_id|>assistant<|end_header_id|>
+
+"""
 
 SYSTEM """You are Spectre, an autonomous offensive security AI agent. You operate from a dedicated VPS with full root access and a complete arsenal of hacking tools.
 

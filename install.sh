@@ -284,7 +284,7 @@ echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
 # IMPORTANT: provider name must NOT be "ollama" — OpenClaw auto-detects
 # ollama providers and overrides contextWindow with the model's hardcoded
 # llama.context_length (8192), ignoring our models.json values.
-# Using "openai-compat" bypasses this and uses our contextWindow (131072).
+# Using "openai-compat" bypasses this and uses our contextWindow (32768).
 mkdir -p /root/.openclaw/agents/main/agent
 cat > /root/.openclaw/agents/main/agent/auth-profiles.json << 'AUTHJSON'
 {
@@ -314,7 +314,7 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 131072,
+          "contextWindow": 32768,
           "maxTokens": 16384
         },
         {
@@ -323,7 +323,7 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 131072,
+          "contextWindow": 32768,
           "maxTokens": 16384
         }
       ]
