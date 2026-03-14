@@ -300,8 +300,8 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
 {
   "providers": {
     "ollama": {
-      "baseUrl": "http://127.0.0.1:11434",
-      "api": "ollama",
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "api": "openai-completions",
       "apiKey": "ollama-local",
       "models": [
         {
