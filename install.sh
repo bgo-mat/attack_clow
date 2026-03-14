@@ -280,26 +280,30 @@ openclaw doctor --fix 2>/dev/null || true
 export OLLAMA_API_KEY="ollama-local"
 echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
 
-# Configure Ollama provider — auth-profiles.json
+# Configure provider — auth-profiles.json
+# IMPORTANT: provider name must NOT be "ollama" — OpenClaw auto-detects
+# ollama providers and overrides contextWindow with the model's hardcoded
+# llama.context_length (8192), ignoring our models.json values.
+# Using "openai-compat" bypasses this and uses our contextWindow (131072).
 mkdir -p /root/.openclaw/agents/main/agent
 cat > /root/.openclaw/agents/main/agent/auth-profiles.json << 'AUTHJSON'
 {
   "version": 1,
   "profiles": {
-    "ollama:default": {
+    "openai-compat:default": {
       "type": "api_key",
-      "provider": "ollama",
+      "provider": "openai-compat",
       "key": "ollama-local"
     }
   }
 }
 AUTHJSON
 
-# Configure Ollama models — models.json
+# Configure models — models.json (via Ollama's OpenAI-compatible endpoint)
 cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
 {
   "providers": {
-    "ollama": {
+    "openai-compat": {
       "baseUrl": "http://127.0.0.1:11434/v1",
       "api": "openai-completions",
       "apiKey": "ollama-local",

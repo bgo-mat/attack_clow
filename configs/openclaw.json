@@ -4,8 +4,8 @@
   },
   "auth": {
     "profiles": {
-      "ollama:default": {
-        "provider": "ollama",
+      "openai-compat:default": {
+        "provider": "openai-compat",
         "mode": "api_key"
       }
     }
@@ -13,11 +13,11 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "ollama/spectre:latest",
+        "primary": "openai-compat/spectre:latest",
         "fallbacks": []
       },
       "models": {
-        "ollama/spectre:latest": {
+        "openai-compat/spectre:latest": {
           "alias": "Spectre (dolphin-llama3:70b uncensored)"
         }
       },
