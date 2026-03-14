@@ -94,7 +94,7 @@ import sys,json
 for a in json.load(sys.stdin).get('assets',[]):
     if 'amd64.deb' in a['name'] and 'dev' not in a['name']:
         print(a['browser_download_url']); break
-" 2>/dev/null)
+" 2>/dev/null) || true
     if [ -n "$R2_DEB" ]; then
         wget -q "$R2_DEB" -O /tmp/r2.deb && dpkg -i /tmp/r2.deb && rm /tmp/r2.deb
         log "radare2 installed"
@@ -398,7 +398,7 @@ DASHBOARD_URL="https://$VPS_IP/"
 if [ "$HAS_SYSTEMD" = false ] && curl -s http://localhost:11112/ &>/dev/null; then
     log "Vast.ai detected — creating Cloudflare tunnel for dashboard..."
     TUNNEL_JSON=$(curl -s --max-time 30 "http://localhost:11112/get-quick-tunnel/http://localhost:18790" 2>/dev/null)
-    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null)
+    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null) || true
     if [ -n "$TUNNEL_URL" ]; then
         log "Cloudflare tunnel created: $TUNNEL_URL"
         DASHBOARD_URL="$TUNNEL_URL"
@@ -412,7 +412,7 @@ if '$TUNNEL_URL' not in origins:
     origins.append('$TUNNEL_URL')
 with open('/root/.openclaw/openclaw.json', 'w') as f:
     json.dump(cfg, f, indent=2)
-"
+" || warn "Failed to update allowedOrigins"
         log "Added tunnel to allowedOrigins"
     else
         warn "Cloudflare tunnel creation failed — access gateway directly at http://$VPS_IP:18790"
