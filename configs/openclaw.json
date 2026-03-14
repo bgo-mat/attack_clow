@@ -13,11 +13,11 @@
   "agents": {
     "defaults": {
       "model": {
-        "primary": "spectre",
+        "primary": "ollama/spectre",
         "fallbacks": []
       },
       "models": {
-        "spectre": {
+        "ollama/spectre": {
           "alias": "Spectre (dolphin-llama3:70b uncensored)"
         }
       },
