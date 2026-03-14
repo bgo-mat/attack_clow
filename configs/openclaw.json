@@ -18,7 +18,7 @@
       },
       "models": {
         "openai-compat/spectre:latest": {
-          "alias": "Spectre (dolphin-llama3:70b uncensored)"
+          "alias": "Spectre (qwen3-abliterated:32b uncensored)"
         }
       },
       "workspace": "/root/.openclaw/workspace",

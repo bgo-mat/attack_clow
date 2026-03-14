@@ -223,8 +223,8 @@ else
 fi
 
 # Pull the uncensored model
-info "Pulling dolphin-llama3:70b (this will take a while ~40GB)..."
-ollama pull dolphin-llama3:70b
+info "Pulling huihui_ai/qwen3-abliterated:32b (this will take a while ~20GB)..."
+ollama pull huihui_ai/qwen3-abliterated:32b
 log "Model downloaded"
 
 # Create custom Spectre model with embedded system prompt
@@ -310,7 +310,7 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
       "models": [
         {
           "id": "spectre:latest",
-          "name": "Spectre (dolphin-llama3:70b uncensored)",
+          "name": "Spectre (huihui_ai/qwen3-abliterated:32b uncensored)",
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
@@ -318,8 +318,8 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
           "maxTokens": 16384
         },
         {
-          "id": "dolphin-llama3:70b",
-          "name": "dolphin-llama3:70b",
+          "id": "huihui_ai/qwen3-abliterated:32b",
+          "name": "huihui_ai/qwen3-abliterated:32b",
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
@@ -537,7 +537,7 @@ echo ""
 echo "  Server IP:     $VPS_IP"
 echo "  Dashboard:     $DASHBOARD_URL"
 echo "  Password:      (the one you entered)"
-echo "  Model:         spectre (dolphin-llama3:70b uncensored)"
+echo "  Model:         spectre (huihui_ai/qwen3-abliterated:32b uncensored)"
 echo "  Ollama API:    http://127.0.0.1:11434"
 echo ""
 echo "  Next steps:"
