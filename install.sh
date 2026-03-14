@@ -272,31 +272,57 @@ sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
 
 cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json
 
-# Initialize OpenClaw and configure Ollama provider via CLI
+# Initialize OpenClaw
 openclaw onboard --accept-risk 2>/dev/null || true
 openclaw doctor --fix 2>/dev/null || true
 
-# Configure Ollama as the model provider
-# OpenClaw needs models scanned/registered — we register via the agent models config
+# Set OLLAMA_API_KEY globally
+export OLLAMA_API_KEY="ollama-local"
+echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
+
+# Configure Ollama provider — auth-profiles.json
 mkdir -p /root/.openclaw/agents/main/agent
-cat > /root/.openclaw/agents/main/agent/models.json << MODELJSON
+cat > /root/.openclaw/agents/main/agent/auth-profiles.json << 'AUTHJSON'
+{
+  "version": 1,
+  "profiles": {
+    "ollama:default": {
+      "type": "api_key",
+      "provider": "ollama",
+      "key": "ollama-local"
+    }
+  }
+}
+AUTHJSON
+
+# Configure Ollama models — models.json
+cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
 {
   "providers": {
     "ollama": {
-      "baseUrl": "http://127.0.0.1:11434/v1",
-      "api": "openai-completions",
+      "baseUrl": "http://127.0.0.1:11434",
+      "api": "ollama",
+      "apiKey": "ollama-local",
       "models": [
         {
-          "id": "spectre",
+          "id": "spectre:latest",
           "name": "Spectre (dolphin-llama3:70b uncensored)",
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
           "contextWindow": 8192,
-          "maxTokens": 4096
+          "maxTokens": 8192
+        },
+        {
+          "id": "dolphin-llama3:70b",
+          "name": "dolphin-llama3:70b",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+          "contextWindow": 8192,
+          "maxTokens": 8192
         }
-      ],
-      "apiKey": "ollama"
+      ]
     }
   }
 }
@@ -350,7 +376,7 @@ if [ "$HAS_SYSTEMD" = true ]; then
     systemctl --user start openclaw-gateway
 else
     # Container mode: start gateway directly in background
-    openclaw gateway --port 18790 &>/dev/null &
+    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
     sleep 3
     if curl -s http://127.0.0.1:18790 &>/dev/null; then
         log "OpenClaw gateway running (direct mode)"
@@ -422,7 +448,7 @@ fi
 
 # OpenClaw Gateway
 if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
-    openclaw gateway --port 18790 &>/dev/null &
+    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
     sleep 3
     echo "[+] OpenClaw gateway started"
 else
