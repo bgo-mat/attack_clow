@@ -523,6 +523,16 @@ echo "  Dashboard: $DASHBOARD_URL"
 echo "========================================="
 ALLEOF
     chmod +x /usr/local/bin/spectre-start-all
+
+    # Auto-start services on login (first shell session triggers it)
+    cat > /etc/profile.d/spectre-autostart.sh << 'PROFILEEOF'
+# Spectre auto-start: launch services if not already running
+if [ "$(id -u)" = "0" ] && ! curl -s http://127.0.0.1:18790 &>/dev/null 2>&1; then
+    spectre-start-all
+fi
+PROFILEEOF
+    chmod +x /etc/profile.d/spectre-autostart.sh
+    log "Created auto-start hook in /etc/profile.d/"
     log "Created 'spectre-start-all' command for container restarts"
 fi
 
