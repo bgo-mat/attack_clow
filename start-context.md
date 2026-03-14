@@ -48,7 +48,7 @@ You are managing a Spectre pentest agent deployment. Here is the full system con
 
 - IP: __VPS_IP__
 - Dashboard: https://__VPS_IP__/
-- Model: spectre (huihui_ai/qwen3-abliterated:32b uncensored, via Ollama)
+- Model: spectre (huihui_ai/qwen3.5-abliterated:122b uncensored, via Ollama)
 
 ## Common Operations
 
