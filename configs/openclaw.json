@@ -1,44 +1,25 @@
 {
   "meta": {
-    "lastTouchedVersion": "2026.3.13",
-    "lastTouchedAt": "2026-03-14T15:29:01.721Z"
-  },
-  "wizard": {
-    "lastRunAt": "2026-03-14T14:36:34.977Z",
-    "lastRunVersion": "2026.3.13",
-    "lastRunCommand": "doctor",
-    "lastRunMode": "local"
+    "lastTouchedVersion": "2026.3.13"
   },
   "auth": {
     "profiles": {
-      "openrouter:default": {
-        "provider": "openrouter",
-        "mode": "api_key"
+      "ollama:default": {
+        "provider": "ollama",
+        "mode": "none"
       }
     }
   },
   "agents": {
     "defaults": {
       "model": {
-        "primary": "openrouter/hunter-alpha",
-        "fallbacks": [
-          "nvidia/nemotron-3-super-120b-a12b:free",
-          "stepfun/step-3.5-flash:free",
-          "openrouter/healer-alpha",
-          "openrouter/free"
-        ]
+        "primary": "spectre",
+        "fallbacks": []
       },
       "models": {
-        "openrouter/auto": {
-          "alias": "OpenRouter"
-        },
-        "qwen/qwen3-coder:free": {},
-        "nousresearch/hermes-3-llama-3.1-405b:free": {},
-        "openrouter/hunter-alpha": {},
-        "nvidia/nemotron-3-super-120b-a12b:free": {},
-        "meta-llama/llama-3.3-70b-instruct:free": {},
-        "mistralai/mistral-small-3.1-24b-instruct:free": {},
-        "openrouter/free": {}
+        "spectre": {
+          "alias": "Spectre (dolphin-llama3.1:70b uncensored)"
+        }
       },
       "workspace": "/root/.openclaw/workspace",
       "memorySearch": {
@@ -69,25 +50,24 @@
       "allowedOrigins": [
         "http://localhost:18790",
         "http://127.0.0.1:18790",
-        "http://76.13.60.134:18790",
-        "https://76.13.60.134"
+        "http://__VPS_IP__:18790",
+        "https://__VPS_IP__"
       ]
     },
     "auth": {
       "mode": "password",
-      "token": "CHANGE_ME_TOKEN",
-      "password": "CHANGE_ME_PASSWORD"
+      "token": "__TOKEN__",
+      "password": "__PASSWORD__"
     },
     "tailscale": {
       "mode": "off",
       "resetOnExit": false
     }
   },
-  "plugins": {
-    "entries": {
-      "qwen-portal-auth": {
-        "enabled": true
-      }
+  "providers": {
+    "ollama": {
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "api": "openai-completions"
     }
   }
 }

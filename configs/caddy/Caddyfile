@@ -5,11 +5,10 @@
 :443 {
 	tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 
-	# Pass token via query string to the backend
 	reverse_proxy 127.0.0.1:18790 {
 		header_up Host {host}
 		header_up X-Forwarded-For {remote_host}
 		header_up X-Forwarded-Proto https
-		header_up X-Gateway-Token Lavieestbelle44
+		header_up X-Gateway-Token __TOKEN__
 	}
 }
