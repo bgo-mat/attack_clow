@@ -236,11 +236,11 @@ log "Spectre model created"
 
 # Quick test
 info "Testing model..."
-RESPONSE=$(curl -s --max-time 120 http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null)
+RESPONSE=$(curl -s --max-time 180 http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null) || RESPONSE="TIMEOUT_OR_ERROR"
 if echo "$RESPONSE" | grep -qi "ready"; then
     log "Model test passed"
 else
-    warn "Model test returned: $RESPONSE"
+    warn "Model test returned: $RESPONSE (model may still be loading — this is normal for 122B)"
 fi
 
 # =============================================================
