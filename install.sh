@@ -192,8 +192,8 @@ fi
 log "Ollama running"
 
 # Pull the uncensored model
-info "Pulling dolphin-llama3.1:70b-q4_K_M (this will take a while ~40GB)..."
-ollama pull dolphin-llama3.1:70b-q4_K_M
+info "Pulling dolphin-llama3:70b (this will take a while ~40GB)..."
+ollama pull dolphin-llama3:70b
 log "Model downloaded"
 
 # Create custom Spectre model with embedded system prompt
