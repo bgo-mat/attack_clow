@@ -51,7 +51,8 @@
         "http://localhost:18790",
         "http://127.0.0.1:18790",
         "http://__VPS_IP__:18790",
-        "https://__VPS_IP__"
+        "https://__VPS_IP__",
+        "https://__VPS_IP__:443"
       ]
     },
     "auth": {

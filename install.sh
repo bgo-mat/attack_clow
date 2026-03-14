@@ -388,6 +388,36 @@ fi
 log "OpenClaw gateway started"
 
 # =============================================================
+# 12b. CLOUDFLARE TUNNEL (Vast.ai containers)
+# =============================================================
+DASHBOARD_URL="https://$VPS_IP/"
+if [ "$HAS_SYSTEMD" = false ] && curl -s http://localhost:11112/ &>/dev/null; then
+    log "Vast.ai detected — creating Cloudflare tunnel for dashboard..."
+    TUNNEL_JSON=$(curl -s --max-time 30 "http://localhost:11112/get-quick-tunnel/http://localhost:18790" 2>/dev/null)
+    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null)
+    if [ -n "$TUNNEL_URL" ]; then
+        log "Cloudflare tunnel created: $TUNNEL_URL"
+        DASHBOARD_URL="$TUNNEL_URL"
+        # Add tunnel URL to allowedOrigins
+        python3 -c "
+import json
+with open('/root/.openclaw/openclaw.json') as f:
+    cfg = json.load(f)
+origins = cfg['gateway']['controlUi']['allowedOrigins']
+if '$TUNNEL_URL' not in origins:
+    origins.append('$TUNNEL_URL')
+with open('/root/.openclaw/openclaw.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+"
+        log "Added tunnel to allowedOrigins"
+    else
+        warn "Cloudflare tunnel creation failed — access gateway directly at http://$VPS_IP:18790"
+    fi
+else
+    log "Direct IP access: $DASHBOARD_URL"
+fi
+
+# =============================================================
 # 13. CLAUDE CLI
 # =============================================================
 log "Installing Claude CLI..."
@@ -455,11 +485,37 @@ else
     echo "[+] OpenClaw gateway already running"
 fi
 
-VPS_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
+# Cloudflare tunnel (Vast.ai)
+DASHBOARD_URL=""
+if curl -s http://localhost:11112/ &>/dev/null; then
+    TUNNEL_JSON=$(curl -s --max-time 30 "http://localhost:11112/get-quick-tunnel/http://localhost:18790" 2>/dev/null)
+    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null)
+    if [ -n "$TUNNEL_URL" ]; then
+        DASHBOARD_URL="$TUNNEL_URL"
+        # Update allowedOrigins
+        python3 -c "
+import json
+with open('/root/.openclaw/openclaw.json') as f:
+    cfg = json.load(f)
+origins = cfg['gateway']['controlUi']['allowedOrigins']
+if '$TUNNEL_URL' not in origins:
+    origins.append('$TUNNEL_URL')
+    with open('/root/.openclaw/openclaw.json', 'w') as f:
+        json.dump(cfg, f, indent=2)
+"
+        echo "[+] Cloudflare tunnel: $TUNNEL_URL"
+    fi
+fi
+
+if [ -z "$DASHBOARD_URL" ]; then
+    VPS_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null)
+    DASHBOARD_URL="https://$VPS_IP/"
+fi
+
 echo ""
 echo "========================================="
 echo "  All services running"
-echo "  Dashboard: https://$VPS_IP/"
+echo "  Dashboard: $DASHBOARD_URL"
 echo "========================================="
 ALLEOF
     chmod +x /usr/local/bin/spectre-start-all
@@ -475,17 +531,16 @@ echo "  SPECTRE INSTALLATION COMPLETE"
 echo "========================================="
 echo ""
 echo "  Server IP:     $VPS_IP"
-echo "  Dashboard:     https://$VPS_IP/"
+echo "  Dashboard:     $DASHBOARD_URL"
 echo "  Password:      (the one you entered)"
 echo "  Model:         spectre (dolphin-llama3:70b uncensored)"
 echo "  Ollama API:    http://127.0.0.1:11434"
 echo ""
 echo "  Next steps:"
 echo "  1. Run: claude /login"
-echo "  2. Open https://$VPS_IP/ in your browser"
-echo "  3. Accept the self-signed certificate"
-echo "  4. Enter your password to connect"
-echo "  5. Approve device: openclaw devices list && openclaw devices approve <id>"
+echo "  2. Open $DASHBOARD_URL in your browser"
+echo "  3. Enter your password to connect"
+echo "  4. Approve device: openclaw devices list && openclaw devices approve <id>"
 echo ""
 echo "  Commands:"
 echo "  - start              → Launch Claude CLI with full Spectre context"
