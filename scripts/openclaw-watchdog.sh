@@ -76,12 +76,23 @@ restart_gateway() {
         disown
     fi
 
-    sleep 5
-    if gateway_alive; then
-        log "RESTART: Gateway recovered successfully"
-    else
-        log "RESTART: WARNING — Gateway still not responding after restart"
-    fi
+    # Retry loop: wait up to 30s for gateway to come back
+    for attempt in 1 2 3; do
+        sleep 10
+        if gateway_alive; then
+            log "RESTART: Gateway recovered successfully (attempt $attempt)"
+            return
+        fi
+        # If not up yet, kill and relaunch
+        if [ "$attempt" -lt 3 ]; then
+            log "RESTART: Attempt $attempt failed, retrying..."
+            pkill -f "openclaw.*gateway" 2>/dev/null || true
+            sleep 3
+            OLLAMA_API_KEY="ollama-local" openclaw gateway --port "$GATEWAY_PORT" &>/dev/null &
+            disown
+        fi
+    done
+    log "RESTART: FAILED — Gateway not responding after 3 attempts"
 }
 
 # --- MAIN ---
