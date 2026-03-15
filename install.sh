@@ -469,16 +469,7 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
       "models": [
         {
           "id": "spectre:latest",
-          "name": "Spectre (huihui_ai/qwen3.5-abliterated:122b uncensored)",
-          "reasoning": false,
-          "input": ["text"],
-          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 32768,
-          "maxTokens": 16384
-        },
-        {
-          "id": "huihui_ai/qwen3.5-abliterated:122b",
-          "name": "huihui_ai/qwen3.5-abliterated:122b",
+          "name": "Spectre (122B uncensored)",
           "reasoning": false,
           "input": ["text"],
           "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
