@@ -410,6 +410,19 @@ if [ -z "$DASHBOARD_URL" ]; then
     DASHBOARD_URL="https://$VPS_IP/"
 fi
 
+# Watchdog
+if [ -x /usr/local/bin/openclaw-watchdog ]; then
+    if command -v crontab &>/dev/null; then
+        (crontab -l 2>/dev/null | grep -v openclaw-watchdog; echo "*/2 * * * * /usr/local/bin/openclaw-watchdog") | crontab -
+        service cron start 2>/dev/null || true
+        echo "[+] Watchdog cron ensured"
+    elif ! pgrep -f openclaw-watchdog-loop &>/dev/null; then
+        nohup /usr/local/bin/openclaw-watchdog-loop &>/dev/null &
+        disown
+        echo "[+] Watchdog loop started"
+    fi
+fi
+
 echo ""
 echo "========================================="
 echo "  All services running"
@@ -551,6 +564,66 @@ with open('/root/.openclaw/openclaw.json', 'w') as f:
 fi
 
 # =============================================================
+# 17. WATCHDOG — Auto-restart for stuck/crashed gateway
+# =============================================================
+log "Setting up OpenClaw watchdog..."
+
+cp "$SCRIPT_DIR/scripts/openclaw-watchdog.sh" /usr/local/bin/openclaw-watchdog
+chmod +x /usr/local/bin/openclaw-watchdog
+touch /var/log/openclaw-watchdog.log
+
+if [ "$HAS_SYSTEMD" = true ]; then
+    cat > /root/.config/systemd/user/openclaw-watchdog.service << 'WDSVC'
+[Unit]
+Description=OpenClaw Watchdog Check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/openclaw-watchdog
+Environment=HOME=/root
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+WDSVC
+
+    cat > /root/.config/systemd/user/openclaw-watchdog.timer << 'WDTMR'
+[Unit]
+Description=Run OpenClaw watchdog every 2 minutes
+
+[Timer]
+OnBootSec=120
+OnUnitActiveSec=120
+
+[Install]
+WantedBy=timers.target
+WDTMR
+
+    export XDG_RUNTIME_DIR=/run/user/0
+    systemctl --user daemon-reload
+    systemctl --user enable openclaw-watchdog.timer
+    systemctl --user start openclaw-watchdog.timer
+    log "Watchdog systemd timer configured (every 2 min)"
+else
+    if command -v crontab &>/dev/null; then
+        (crontab -l 2>/dev/null | grep -v openclaw-watchdog; echo "*/2 * * * * /usr/local/bin/openclaw-watchdog") | crontab -
+        service cron start 2>/dev/null || crond 2>/dev/null || true
+        log "Watchdog cron configured (every 2 min)"
+    else
+        cat > /usr/local/bin/openclaw-watchdog-loop << 'LOOPEOF'
+#!/bin/bash
+while true; do
+    /usr/local/bin/openclaw-watchdog
+    sleep 120
+done
+LOOPEOF
+        chmod +x /usr/local/bin/openclaw-watchdog-loop
+        nohup /usr/local/bin/openclaw-watchdog-loop &>/dev/null &
+        disown
+        log "Watchdog background loop started (every 2 min)"
+    fi
+fi
+
+log "Watchdog setup complete"
+
+# =============================================================
 # DONE
 # =============================================================
 echo ""
@@ -574,6 +647,7 @@ echo "  Commands:"
 echo "  - start              → Launch Claude CLI with full Spectre context"
 echo "  - spectre-start-all  → Restart all services (container mode)"
 echo "  - ollama list        → Show installed models"
+echo "  - openclaw-watchdog   → Auto-restart stuck sessions (every 2 min)"
 echo "  - opsec-check.sh     → Verify OPSEC"
 echo ""
 echo "========================================="
