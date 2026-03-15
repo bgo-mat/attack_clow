@@ -272,67 +272,12 @@ sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
 
 cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json
 
-# Initialize OpenClaw
-openclaw onboard --accept-risk 2>/dev/null || true
-openclaw doctor --fix 2>/dev/null || true
-
 # Set OLLAMA_API_KEY globally
 export OLLAMA_API_KEY="ollama-local"
-echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
+grep -qxF 'export OLLAMA_API_KEY="ollama-local"' /root/.bashrc 2>/dev/null || \
+    echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
 
-# Configure provider — auth-profiles.json
-# IMPORTANT: provider name must NOT be "ollama" — OpenClaw auto-detects
-# ollama providers and overrides contextWindow with the model's hardcoded
-# llama.context_length (8192), ignoring our models.json values.
-# Using "openai-compat" bypasses this and uses our contextWindow (32768).
-mkdir -p /root/.openclaw/agents/main/agent
-cat > /root/.openclaw/agents/main/agent/auth-profiles.json << 'AUTHJSON'
-{
-  "version": 1,
-  "profiles": {
-    "openai-compat:default": {
-      "type": "api_key",
-      "provider": "openai-compat",
-      "key": "ollama-local"
-    }
-  }
-}
-AUTHJSON
-
-# Configure models — models.json (via Ollama's OpenAI-compatible endpoint)
-cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
-{
-  "providers": {
-    "openai-compat": {
-      "baseUrl": "http://127.0.0.1:11434/v1",
-      "api": "openai-completions",
-      "apiKey": "ollama-local",
-      "models": [
-        {
-          "id": "spectre:latest",
-          "name": "Spectre (huihui_ai/qwen3.5-abliterated:122b uncensored)",
-          "reasoning": false,
-          "input": ["text"],
-          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 32768,
-          "maxTokens": 16384
-        },
-        {
-          "id": "huihui_ai/qwen3.5-abliterated:122b",
-          "name": "huihui_ai/qwen3.5-abliterated:122b",
-          "reasoning": false,
-          "input": ["text"],
-          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
-          "contextWindow": 32768,
-          "maxTokens": 16384
-        }
-      ]
-    }
-  }
-}
-MODELJSON
-
-log "OpenClaw workspace deployed"
+log "OpenClaw files deployed (onboard will run at the end)"
 
 # =============================================================
 # 11. HTTPS PROXY (Caddy + self-signed cert)
@@ -366,60 +311,9 @@ fi
 log "Caddy HTTPS configured for $VPS_IP"
 
 # =============================================================
-# 12. OPENCLAW GATEWAY
-# =============================================================
-log "Starting OpenClaw gateway..."
-
-if [ "$HAS_SYSTEMD" = true ]; then
-    mkdir -p /root/.config/systemd/user
-    cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/
-    loginctl enable-linger root 2>/dev/null || true
-    export XDG_RUNTIME_DIR=/run/user/0
-    systemctl --user daemon-reload
-    systemctl --user enable openclaw-gateway
-    systemctl --user start openclaw-gateway
-else
-    # Container mode: start gateway directly in background
-    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
-    sleep 3
-    if curl -s http://127.0.0.1:18790 &>/dev/null; then
-        log "OpenClaw gateway running (direct mode)"
-    else
-        warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
-    fi
-fi
-
-log "OpenClaw gateway started"
-
-# =============================================================
-# 12b. CLOUDFLARE TUNNEL (Vast.ai containers)
+# 12. HTTPS DASHBOARD URL (determined before gateway start)
 # =============================================================
 DASHBOARD_URL="https://$VPS_IP/"
-if [ "$HAS_SYSTEMD" = false ] && curl -s http://localhost:11112/ &>/dev/null; then
-    log "Vast.ai detected — creating Cloudflare tunnel for dashboard..."
-    TUNNEL_JSON=$(curl -s --max-time 30 "http://localhost:11112/get-quick-tunnel/http://localhost:18790" 2>/dev/null)
-    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null) || true
-    if [ -n "$TUNNEL_URL" ]; then
-        log "Cloudflare tunnel created: $TUNNEL_URL"
-        DASHBOARD_URL="$TUNNEL_URL"
-        # Add tunnel URL to allowedOrigins
-        python3 -c "
-import json
-with open('/root/.openclaw/openclaw.json') as f:
-    cfg = json.load(f)
-origins = cfg['gateway']['controlUi']['allowedOrigins']
-if '$TUNNEL_URL' not in origins:
-    origins.append('$TUNNEL_URL')
-with open('/root/.openclaw/openclaw.json', 'w') as f:
-    json.dump(cfg, f, indent=2)
-" || warn "Failed to update allowedOrigins"
-        log "Added tunnel to allowedOrigins"
-    else
-        warn "Cloudflare tunnel creation failed — access gateway directly at http://$VPS_IP:18790"
-    fi
-else
-    log "Direct IP access: $DASHBOARD_URL"
-fi
 
 # =============================================================
 # 13. CLAUDE CLI
@@ -534,6 +428,122 @@ PROFILEEOF
     chmod +x /etc/profile.d/spectre-autostart.sh
     log "Created auto-start hook in /etc/profile.d/"
     log "Created 'spectre-start-all' command for container restarts"
+fi
+
+# =============================================================
+# 15. OPENCLAW ONBOARD + CONFIGURATION (interactive — runs last)
+# =============================================================
+# onboard and doctor run here so their interactive prompts don't
+# block the rest of the installation.
+log "Initializing OpenClaw (interactive setup)..."
+openclaw onboard --accept-risk 2>/dev/null || true
+openclaw doctor --fix 2>/dev/null || true
+
+# Configure provider AFTER doctor (doctor auto-detects ollama and
+# overwrites models.json — we re-write it with our config).
+# IMPORTANT: provider name must NOT be "ollama" — OpenClaw auto-detects
+# ollama providers and overrides contextWindow with the model's hardcoded
+# llama.context_length (8192), ignoring our models.json values.
+# Using "openai-compat" bypasses this and uses our contextWindow (32768).
+mkdir -p /root/.openclaw/agents/main/agent
+cat > /root/.openclaw/agents/main/agent/auth-profiles.json << 'AUTHJSON'
+{
+  "version": 1,
+  "profiles": {
+    "openai-compat:default": {
+      "type": "api_key",
+      "provider": "openai-compat",
+      "key": "ollama-local"
+    }
+  }
+}
+AUTHJSON
+
+cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
+{
+  "providers": {
+    "openai-compat": {
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "api": "openai-completions",
+      "apiKey": "ollama-local",
+      "models": [
+        {
+          "id": "spectre:latest",
+          "name": "Spectre (huihui_ai/qwen3.5-abliterated:122b uncensored)",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+          "contextWindow": 32768,
+          "maxTokens": 16384
+        },
+        {
+          "id": "huihui_ai/qwen3.5-abliterated:122b",
+          "name": "huihui_ai/qwen3.5-abliterated:122b",
+          "reasoning": false,
+          "input": ["text"],
+          "cost": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+          "contextWindow": 32768,
+          "maxTokens": 16384
+        }
+      ]
+    }
+  }
+}
+MODELJSON
+
+log "OpenClaw configured"
+
+# =============================================================
+# 16. OPENCLAW GATEWAY
+# =============================================================
+log "Starting OpenClaw gateway..."
+
+if [ "$HAS_SYSTEMD" = true ]; then
+    mkdir -p /root/.config/systemd/user
+    cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/
+    loginctl enable-linger root 2>/dev/null || true
+    export XDG_RUNTIME_DIR=/run/user/0
+    systemctl --user daemon-reload
+    systemctl --user enable openclaw-gateway
+    systemctl --user start openclaw-gateway
+else
+    # Container mode: start gateway directly in background
+    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+    sleep 3
+    if curl -s http://127.0.0.1:18790 &>/dev/null; then
+        log "OpenClaw gateway running (direct mode)"
+    else
+        warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
+    fi
+fi
+
+log "OpenClaw gateway started"
+
+# =============================================================
+# 16b. CLOUDFLARE TUNNEL (Vast.ai containers)
+# =============================================================
+if [ "$HAS_SYSTEMD" = false ] && curl -s http://localhost:11112/ &>/dev/null; then
+    log "Vast.ai detected — creating Cloudflare tunnel for dashboard..."
+    TUNNEL_JSON=$(curl -s --max-time 30 "http://localhost:11112/get-quick-tunnel/http://localhost:18790" 2>/dev/null)
+    TUNNEL_URL=$(echo "$TUNNEL_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('tunnel_url',''))" 2>/dev/null) || true
+    if [ -n "$TUNNEL_URL" ]; then
+        log "Cloudflare tunnel created: $TUNNEL_URL"
+        DASHBOARD_URL="$TUNNEL_URL"
+        # Add tunnel URL to allowedOrigins
+        python3 -c "
+import json
+with open('/root/.openclaw/openclaw.json') as f:
+    cfg = json.load(f)
+origins = cfg['gateway']['controlUi']['allowedOrigins']
+if '$TUNNEL_URL' not in origins:
+    origins.append('$TUNNEL_URL')
+with open('/root/.openclaw/openclaw.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" || warn "Failed to update allowedOrigins"
+        log "Added tunnel to allowedOrigins"
+    else
+        warn "Cloudflare tunnel creation failed — access gateway directly at http://$VPS_IP:18790"
+    fi
 fi
 
 # =============================================================
