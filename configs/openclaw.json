@@ -23,7 +23,7 @@
       },
       "workspace": "/root/.openclaw/workspace",
       "memorySearch": {
-        "enabled": false
+        "enabled": true
       },
       "compaction": {
         "mode": "safeguard"

@@ -70,14 +70,14 @@ apt-get update -qq
 apt-get install -y -qq \
     nmap masscan netcat-openbsd socat \
     ffuf gobuster dirb sqlmap wfuzz \
-    hydra medusa john \
+    hydra medusa john hashcat \
     gdb binwalk ltrace strace \
     proxychains4 tor \
     curl httpie jq whois dnsutils \
     tmux git unzip wget \
     python3 python3-pip \
-    whatweb \
-    ruby rubygems \
+    whatweb nikto \
+    ruby rubygems libyajl-dev \
     nodejs npm \
     openssl \
     caddy 2>/dev/null || warn "Some packages may have failed — check manually"
@@ -127,12 +127,53 @@ install_go_tool() {
 install_go_tool subfinder projectdiscovery/subfinder
 install_go_tool httpx projectdiscovery/httpx
 install_go_tool nuclei projectdiscovery/nuclei
+install_go_tool katana projectdiscovery/katana
+
+# Go tools via go install (require Go SDK)
+log "Installing Go SDK and additional tools..."
+if ! command -v go &>/dev/null; then
+    wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz -O /tmp/go.tar.gz && \
+        tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz
+fi
+export GOPATH=/root/go PATH=$PATH:/usr/local/go/bin:/root/go/bin
+
+for gotool in \
+    "github.com/owasp-amass/amass/v4/...@master" \
+    "github.com/projectdiscovery/interactsh/cmd/interactsh-client@latest" \
+    "github.com/hahwul/dalfox/v2@latest" \
+    "github.com/jpillora/chisel@latest"; do
+    name=$(basename "${gotool%%@*}" | sed 's|/cmd/||; s|/\.\.\.$||; s|.*/||')
+    if ! command -v "$name" &>/dev/null; then
+        go install "$gotool" 2>/dev/null && log "$name installed" || warn "$name install failed"
+    fi
+done
+# Symlink Go tools
+for bin in /root/go/bin/*; do
+    [ -f "$bin" ] && ln -sf "$bin" "/usr/local/bin/$(basename "$bin")" 2>/dev/null
+done
+
+# Kiterunner (API fuzzer)
+if ! command -v kr &>/dev/null; then
+    curl -sL https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_amd64.tar.gz | tar xz -C /usr/local/bin kr 2>/dev/null && \
+        chmod +x /usr/local/bin/kr && log "kiterunner installed" || warn "kiterunner install failed"
+fi
+
+# LinPEAS / WinPEAS
+mkdir -p /opt/peass
+curl -sL https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh -o /opt/peass/linpeas.sh && chmod +x /opt/peass/linpeas.sh
+curl -sL https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASx64.exe -o /opt/peass/winpeas.exe
+log "LinPEAS/WinPEAS installed"
 
 # =============================================================
 # 4. PIP TOOLS
 # =============================================================
 log "Installing pip tools..."
-pip3 install --break-system-packages wafw00f 2>/dev/null || warn "wafw00f pip install failed"
+pip3 install --break-system-packages wafw00f commix arjun impacket 2>/dev/null || warn "Some pip tools failed"
+pip3 install --break-system-packages pipx 2>/dev/null && pipx install git+https://github.com/Pennyw0rth/NetExec.git 2>/dev/null || warn "NetExec install failed"
+# Symlink pipx tools
+for bin in /root/.local/bin/*; do
+    [ -f "$bin" ] && ln -sf "$bin" "/usr/local/bin/$(basename "$bin")" 2>/dev/null
+done
 
 # =============================================================
 # 5. SEARCHSPLOIT
@@ -154,6 +195,33 @@ if [ ! -d /usr/share/seclists ]; then
 else
     log "SecLists already present"
 fi
+
+# =============================================================
+# 6b. METASPLOIT FRAMEWORK
+# =============================================================
+if ! command -v msfconsole &>/dev/null; then
+    log "Installing Metasploit Framework (this takes a while)..."
+    curl -s https://raw.githubusercontent.com/rapid7/metasploit-omnibus/master/config/templates/metasploit-framework-wrappers/msfupdate.erb > /tmp/msfinstall && \
+        chmod +x /tmp/msfinstall && /tmp/msfinstall 2>/dev/null && \
+        log "Metasploit installed" || warn "Metasploit install failed"
+    rm -f /tmp/msfinstall
+fi
+
+# =============================================================
+# 6c. MCP SECURITY HUB + PLAYWRIGHT MCP
+# =============================================================
+log "Installing MCP security servers..."
+if [ ! -d /opt/mcp-security-hub ]; then
+    git clone --depth 1 https://github.com/FuzzingLabs/mcp-security-hub /opt/mcp-security-hub 2>/dev/null
+fi
+pip3 install --break-system-packages mcp 2>/dev/null || true
+for mcp_dir in /opt/mcp-security-hub/*/; do
+    for srv in "$mcp_dir"*/; do
+        [ -f "$srv/requirements.txt" ] && pip3 install --break-system-packages -q -r "$srv/requirements.txt" 2>/dev/null
+    done
+done
+npm install -g @playwright/mcp 2>/dev/null || warn "Playwright MCP install failed"
+log "MCP servers installed"
 
 # =============================================================
 # 7. TOR CONFIGURATION
@@ -272,10 +340,12 @@ sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
 
 cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json
 
-# Set OLLAMA_API_KEY globally
+# Set OLLAMA_API_KEY and Go paths globally
 export OLLAMA_API_KEY="ollama-local"
 grep -qxF 'export OLLAMA_API_KEY="ollama-local"' /root/.bashrc 2>/dev/null || \
     echo 'export OLLAMA_API_KEY="ollama-local"' >> /root/.bashrc
+grep -qxF 'export PATH=$PATH:/usr/local/go/bin:/root/go/bin' /root/.bashrc 2>/dev/null || \
+    echo 'export PATH=$PATH:/usr/local/go/bin:/root/go/bin' >> /root/.bashrc
 
 log "OpenClaw files deployed (onboard will run at the end)"
 
@@ -509,6 +579,22 @@ with open('/root/.openclaw/openclaw.json', 'w') as f:
 " || warn "Failed to fix openclaw.json model config"
 
 log "OpenClaw configured"
+
+# =============================================================
+# 15b. CLAWHUB SKILLS
+# =============================================================
+log "Installing ClawHub skills..."
+SKILLS="auto-security-audit pentest-api-attacker pentest-auth-bypass sql-injection-testing nmap-pentest-scans security-scanner metasploit-skill context-budgeting memory-manager memory-tiering parallel-agents tmux-agents autonomous-execution claude-code-supervisor clawsec-suite"
+for skill in $SKILLS; do
+    if [ ! -d "/root/.openclaw/workspace/skills/$skill" ]; then
+        npx clawhub@latest install "$skill" --force 2>/dev/null && \
+            log "Skill $skill installed" || warn "Skill $skill failed"
+        sleep 2
+    else
+        log "Skill $skill already installed"
+    fi
+done
+log "ClawHub skills installed"
 
 # =============================================================
 # 16. OPENCLAW GATEWAY
