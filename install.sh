@@ -482,6 +482,19 @@ cat > /root/.openclaw/agents/main/agent/models.json << 'MODELJSON'
 }
 MODELJSON
 
+# Fix openclaw.json — onboard/doctor overwrite the model primary
+# with ollama provider. Force it back to openai-compat/spectre:latest.
+python3 -c "
+import json
+with open('/root/.openclaw/openclaw.json') as f:
+    cfg = json.load(f)
+defaults = cfg.get('agents', {}).get('defaults', {})
+defaults['model'] = {'primary': 'openai-compat/spectre:latest', 'fallbacks': []}
+defaults['models'] = {'openai-compat/spectre:latest': {'alias': 'Spectre (122B uncensored)'}}
+with open('/root/.openclaw/openclaw.json', 'w') as f:
+    json.dump(cfg, f, indent=2)
+" || warn "Failed to fix openclaw.json model config"
+
 log "OpenClaw configured"
 
 # =============================================================
