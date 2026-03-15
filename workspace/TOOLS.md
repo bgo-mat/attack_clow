@@ -36,10 +36,6 @@
 - **arjun** — `arjun` — Hidden HTTP parameter discovery
 - **kiterunner (kr)** — `/usr/local/bin/kr` — API endpoint brute-forcer with REST-aware wordlists
 
-## API Testing
-- **kiterunner** — API discovery with contextual patterns (better than ffuf for APIs)
-- **interactsh** — OOB callback server for blind vulnerability testing
-
 ## Credential Attacks
 - **hydra** — `/usr/bin/hydra` — Online password brute-forcing. Stealth: `-t 2 -W 3`
 - **medusa** — `/usr/bin/medusa` — Parallel login brute-forcer
