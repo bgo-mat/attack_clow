@@ -71,6 +71,10 @@ PHASE 6: REPORTING
 | Service/version detection | nmap | `proxychains4 -q nmap -sV -T2 -p<ports> <target>` |
 | Web server vulns | nikto | `proxychains4 -q nikto -h <target> -Pause 1` |
 
+> **IMPORTANT:** Through Tor/proxychains, only TCP connect scans (-sT) work.
+> SYN scans (-sS), UDP scans (-sU), and OS detection (-O) require raw sockets
+> and WILL FAIL silently through SOCKS proxies. NEVER attempt -sS via proxychains.
+
 **Exit criteria:** Subdomains listed, open ports/services identified, tech stack known, WAF status known.
 **Transition:** → PHASE 2
 
@@ -87,6 +91,10 @@ PHASE 6: REPORTING
 | Recursive dir enum | gobuster | `proxychains4 -q gobuster dir -u <target> -w <wordlist> --delay 100ms` |
 | Hidden parameters | arjun | `proxychains4 -q arjun -u <target> --rate-limit 10` |
 | API endpoint discovery | kiterunner | `proxychains4 -q kr scan <target> -w <routes>` |
+
+> **If ffuf returns 100% identical responses (all 403/503):** The target likely has
+> a CDN/WAF blocking automated requests. Use `-mc 200,301,302 -fc 403` to filter,
+> add `-H "User-Agent: Mozilla/5.0 ..."`, or find the real IP behind the CDN first.
 
 ### 2B: Service Enumeration
 | Action | Tool | Command pattern |
@@ -276,7 +284,11 @@ When the target has HTTP/HTTPS services, execute the OWASP checklist below **sys
 
 ```
 Port 80/443 (HTTP/HTTPS)
-  → WAF check (wafw00f)
+  → WAF/CDN check (wafw00f + headers check)
+  → If Cloudflare/CDN detected:
+      → Find real IP (DNS history, subfinder, censys, SecurityTrails)
+      → Test direct IP access: curl -H "Host: target" http://<real-ip>
+      → If real IP found → scan real IP directly
   → Full OWASP methodology (PHASE 3B)
   → Tech stack ID → framework-specific exploits
 
@@ -336,6 +348,13 @@ WAF detected
   → Adapt payloads: encoding, case variation, chunked transfer
   → Try bypass techniques before abandoning vector
   → Test for WAF misconfigurations (IP-based access, subdomain bypass)
+
+CDN/Cloudflare detected (all requests return 403/503)
+  → Confirm CDN: check response headers (cf-ray, server: cloudflare)
+  → Find real IP: DNS history (SecurityTrails), certificate search (censys/crt.sh)
+  → subfinder may reveal subdomains pointing to real IP
+  → Try direct IP with Host header
+  → If no real IP found → focus on exposed non-CDN services (SSH, FTP, etc.)
 
 Dead end (3+ failures on same vector)
   → Document in STATE.md: what was tried, why it failed

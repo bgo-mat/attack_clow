@@ -17,14 +17,14 @@
 - **interactsh-client** — `/usr/local/bin/interactsh-client` — OOB interaction server for blind SSRF/XSS/RCE testing
 
 ## Active Reconnaissance
-- **nmap** — `/usr/bin/nmap` — Port scanning, service detection, NSE scripts. Stealth: `-sT -T2 --scan-delay 1s --data-length 50`
+- **nmap** — `/usr/bin/nmap` — Port scanning, service detection, NSE scripts. Stealth: `-sT -T2 --scan-delay 1s --data-length 50`. **Tor limitation:** Only -sT works through proxychains/Tor. -sS/-sU/-O require raw sockets and will fail silently.
 - **masscan** — `/usr/bin/masscan` — High-speed port scanning (use sparingly — very noisy)
 - **whatweb** — `/usr/bin/whatweb` — Web technology fingerprinting
 - **wafw00f** — `wafw00f` — WAF detection and identification. Run BEFORE any web fuzzing
 - **nikto** — `/usr/bin/nikto` — Web server vulnerability scanner (7000+ checks)
 
 ## Web Application Testing
-- **ffuf** — `/usr/bin/ffuf` — Fast web fuzzer (dirs, params, vhosts). Stealth: `-rate 10`
+- **ffuf** — `/usr/bin/ffuf` — Fast web fuzzer (dirs, params, vhosts). Stealth: `-rate 10`. **Tips:** Use `-mc 200,301,302` to filter noise. Use `-H "User-Agent: Mozilla/5.0 ..."` to bypass basic bot detection. If all 403 → likely CDN/WAF, find real IP first.
 - **gobuster** — `/usr/bin/gobuster` — Directory/DNS/vhost brute-forcing
 - **dirb** — `/usr/bin/dirb` — Web content scanner
 - **sqlmap** — `/usr/bin/sqlmap` — Automated SQL injection. Stealth: `--random-agent --delay=1 --tor`
@@ -74,6 +74,12 @@
 - **dnstwist-mcp** — Typosquatting/phishing domain detection
 - **hashcat-mcp** — GPU hash cracking via MCP
 - **playwright-mcp** — Browser automation for testing SPAs and JS-heavy apps
+
+## CDN / Real IP Discovery
+- **curl headers check** — `curl -sI <target> | grep -i "cf-ray\|cloudflare\|server"` — Detect Cloudflare/CDN
+- **crt.sh** — `curl -s "https://crt.sh/?q=%25.<domain>&output=json" | jq -r '.[].name_value'` — Certificate transparency logs
+- **subfinder** — Subdomains may point to real IP (check A records with `dig`)
+- **SecurityTrails / Censys** — Historical DNS records (manual/API)
 
 ## Utilities
 - **curl** — HTTP client (use `--socks5-hostname 127.0.0.1:9050` for Tor)
