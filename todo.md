@@ -18,16 +18,16 @@
 | 007 | Bloc de réflexion dans SOUL.md | P1 | [x] Done |
 | 008 | Système de notification | P1 | [x] Done |
 | 009 | Mise à jour IDENTITY.md | P2 | [x] Done |
-| 010 | Création de AGENTS-REGISTRY.md | P1 | [ ] TODO |
-| 011 | Agent spécialisé Web (spectre-web) | P1 | [ ] TODO |
-| 012 | Agent spécialisé AD (spectre-ad) | P1 | [ ] TODO |
-| 013 | Agent spécialisé Network (spectre-network) | P2 | [ ] TODO |
-| 014 | Agent spécialisé RE (spectre-re) | P2 | [ ] TODO |
+| 010 | Création de AGENTS-REGISTRY.md | P1 | [x] Done |
+| 011 | Agent spécialisé Web (spectre-web) | P1 | [x] Done |
+| 012 | Agent spécialisé AD (spectre-ad) | P1 | [x] Done |
+| 013 | Agent spécialisé Network (spectre-network) | P2 | [x] Done |
+| 014 | Agent spécialisé RE (spectre-re) | P2 | [x] Done |
 | 015 | Mécanisme de délégation dans SOUL.md | P1 | [ ] TODO |
 | 016 | Test d'intégration complet | P2 | [ ] TODO |
 | 017 | Optimisation du watchdog v2 | P3 | [ ] TODO |
 
-**Progression : 9/17 (53%)**
+**Progression : 14/17 (82%)**
 
 ---
 
