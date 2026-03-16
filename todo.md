@@ -27,7 +27,7 @@
 
 ### TICKET-001: Réécriture du Modelfile
 **Fichier:** `configs/ollama/Modelfile`
-**Statut:** [ ] TODO
+**Statut:** [x] DONE
 **Dépendances:** Aucune
 **Description:**
 Réécrire le system prompt du Modelfile en anglais avec les changements suivants :
@@ -48,7 +48,7 @@ Réécrire le system prompt du Modelfile en anglais avec les changements suivant
 
 ### TICKET-002: Réécriture de SOUL.md
 **Fichier:** `workspace/SOUL.md`
-**Statut:** [ ] TODO
+**Statut:** [x] DONE
 **Dépendances:** TICKET-001
 **Description:**
 Réécrire SOUL.md entièrement en anglais avec cette structure :
@@ -83,7 +83,7 @@ Réécrire SOUL.md entièrement en anglais avec cette structure :
 
 ### TICKET-003: Création de METHODOLOGY.md
 **Fichier:** `workspace/METHODOLOGY.md`
-**Statut:** [ ] TODO
+**Statut:** [x] DONE
 **Dépendances:** Aucune
 **Description:**
 Créer un nouveau fichier qui définit la machine à états méthodologique. Structure hybride MITRE ATT&CK (backbone) + OWASP Testing Guide (web-specific).
