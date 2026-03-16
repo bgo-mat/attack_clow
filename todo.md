@@ -5,6 +5,32 @@
 
 ---
 
+## Suivi d'avancement
+
+| # | Ticket | Priorité | Statut |
+|---|--------|----------|--------|
+| 001 | Réécriture du Modelfile | P0 | [x] Done |
+| 002 | Réécriture de SOUL.md | P0 | [x] Done |
+| 003 | Création de METHODOLOGY.md | P0 | [x] Done |
+| 004 | Réécriture de AGENTS.md | P0 | [x] Done |
+| 005 | Création du template STATE.md | P0 | [x] Done |
+| 006 | Format structuré pour notes.md | P1 | [x] Done |
+| 007 | Bloc de réflexion dans SOUL.md | P1 | [x] Done |
+| 008 | Système de notification | P1 | [x] Done |
+| 009 | Mise à jour IDENTITY.md | P2 | [x] Done |
+| 010 | Création de AGENTS-REGISTRY.md | P1 | [ ] TODO |
+| 011 | Agent spécialisé Web (spectre-web) | P1 | [ ] TODO |
+| 012 | Agent spécialisé AD (spectre-ad) | P1 | [ ] TODO |
+| 013 | Agent spécialisé Network (spectre-network) | P2 | [ ] TODO |
+| 014 | Agent spécialisé RE (spectre-re) | P2 | [ ] TODO |
+| 015 | Mécanisme de délégation dans SOUL.md | P1 | [ ] TODO |
+| 016 | Test d'intégration complet | P2 | [ ] TODO |
+| 017 | Optimisation du watchdog v2 | P3 | [ ] TODO |
+
+**Progression : 9/17 (53%)**
+
+---
+
 ## Déjà en place (baseline)
 
 - [x] Architecture VPS complète (Ollama + OpenClaw + Caddy + Tor)

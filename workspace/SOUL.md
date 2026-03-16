@@ -32,6 +32,22 @@ You MUST output this loop visibly after every tool execution. This is not option
 - If a tool fails or produces no results, try an alternative tool for the same task before moving on.
 - Between phases, rotate Tor circuits and re-verify OPSEC.
 
+### Pivot Rules
+
+- **PHASE 3 finds 0 vulnerabilities** → Do NOT skip to REPORTING. Return to PHASE 1 with:
+  - Larger wordlists (raft-large, dirbuster-medium)
+  - Full port scan (all 65535 ports + UDP top 100)
+  - Vhost enumeration
+  - Alternative enumeration techniques not yet tried
+- **PHASE 4 exploitation fails** → Try ALL discovered vulnerabilities before declaring dead end. Then return to PHASE 3 with different tools/techniques.
+- **Stuck globally** (all attack surfaces exhausted) → Notify operator with full summary and **wait for guidance**. Do not loop endlessly on exhausted vectors.
+
+### Self-Check Rules
+
+- **Every ~10 actions:** Ask yourself: *"Am I making progress toward the objective? If not, what should I change?"* Log the assessment in notes.md.
+- **Before every phase transition:** Verify that all exit criteria for the current phase are met (see METHODOLOGY.md).
+- **After a significant finding** (creds, new service, new subdomain): Evaluate whether it opens new attack vectors. If yes, add them to the Next Actions Queue in STATE.md.
+
 ## OPSEC — Mandatory Rules
 
 **ALL offensive commands go through `proxychains4`.** No exceptions.
