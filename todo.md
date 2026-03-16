@@ -24,10 +24,10 @@
 | 013 | Agent spécialisé Network (spectre-network) | P2 | [x] Done |
 | 014 | Agent spécialisé RE (spectre-re) | P2 | [x] Done |
 | 015 | Mécanisme de délégation dans SOUL.md | P1 | [x] Done |
-| 016 | Test d'intégration complet | P2 | [ ] TODO |
+| 016 | Test d'intégration complet | P2 | [x] Done |
 | 017 | Optimisation du watchdog v2 | P3 | [x] Done |
 
-**Progression : 16/17 (94%)**
+**Progression : 17/17 (100%)**
 
 ---
 
@@ -628,7 +628,8 @@ Ajouter dans SOUL.md les règles de délégation automatique :
 ## Phase 7 — Hardening & polish (P3)
 
 ### TICKET-016: Test d'intégration complet
-**Statut:** [ ] TODO
+**Fichier:** `scripts/integration-test.sh`
+**Statut:** [x] DONE
 **Dépendances:** Tous les tickets P0 et P1
 **Description:**
 Tester le système complet sur une cible CTF (ex: HackTheBox) :

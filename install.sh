@@ -133,7 +133,7 @@ install_go_tool katana projectdiscovery/katana
 log "Installing Go SDK and additional tools..."
 if ! command -v go &>/dev/null; then
     wget -q https://go.dev/dl/go1.23.6.linux-amd64.tar.gz -O /tmp/go.tar.gz && \
-        tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz
+        tar -C /usr/local -xzf /tmp/go.tar.gz && rm /tmp/go.tar.gz || warn "Go SDK install failed"
 fi
 export GOPATH=/root/go PATH=$PATH:/usr/local/go/bin:/root/go/bin
 
@@ -212,14 +212,16 @@ fi
 # =============================================================
 log "Installing MCP security servers..."
 if [ ! -d /opt/mcp-security-hub ]; then
-    git clone --depth 1 https://github.com/FuzzingLabs/mcp-security-hub /opt/mcp-security-hub 2>/dev/null
+    git clone --depth 1 https://github.com/FuzzingLabs/mcp-security-hub /opt/mcp-security-hub 2>/dev/null || warn "MCP security hub clone failed"
 fi
 pip3 install --break-system-packages mcp 2>/dev/null || true
-for mcp_dir in /opt/mcp-security-hub/*/; do
-    for srv in "$mcp_dir"*/; do
-        [ -f "$srv/requirements.txt" ] && pip3 install --break-system-packages -q -r "$srv/requirements.txt" 2>/dev/null
+if [ -d /opt/mcp-security-hub ]; then
+    for mcp_dir in /opt/mcp-security-hub/*/; do
+        for srv in "$mcp_dir"*/; do
+            [ -f "$srv/requirements.txt" ] && pip3 install --break-system-packages -q -r "$srv/requirements.txt" 2>/dev/null || true
+        done
     done
-done
+fi
 npm install -g @playwright/mcp 2>/dev/null || warn "Playwright MCP install failed"
 log "MCP servers installed"
 
@@ -227,7 +229,7 @@ log "MCP servers installed"
 # 7. TOR CONFIGURATION
 # =============================================================
 log "Configuring Tor..."
-cp "$SCRIPT_DIR/configs/tor/torrc" /etc/tor/torrc
+cp "$SCRIPT_DIR/configs/tor/torrc" /etc/tor/torrc 2>/dev/null || warn "Tor config copy failed"
 mkdir -p /var/log/tor
 chown debian-tor:debian-tor /var/log/tor 2>/dev/null || true
 
@@ -251,7 +253,7 @@ log "Tor configured"
 # 8. PROXYCHAINS CONFIGURATION
 # =============================================================
 log "Configuring proxychains..."
-cp "$SCRIPT_DIR/configs/proxychains/proxychains4.conf" /etc/proxychains4.conf
+cp "$SCRIPT_DIR/configs/proxychains/proxychains4.conf" /etc/proxychains4.conf 2>/dev/null || warn "Proxychains config copy failed"
 log "Proxychains configured"
 
 # =============================================================
@@ -259,7 +261,11 @@ log "Proxychains configured"
 # =============================================================
 log "Installing Ollama..."
 if ! command -v ollama &>/dev/null; then
-    curl -fsSL https://ollama.ai/install.sh | sh
+    curl -fsSL https://ollama.ai/install.sh | sh || warn "Ollama install script failed — will retry manually"
+fi
+
+if ! command -v ollama &>/dev/null; then
+    warn "Ollama binary not found after install attempt — skipping model pull"
 fi
 
 # Start Ollama
@@ -291,24 +297,28 @@ else
 fi
 
 # Pull the uncensored model
-info "Pulling huihui_ai/qwen3.5-abliterated:122b (this will take a while ~70GB)..."
-ollama pull huihui_ai/qwen3.5-abliterated:122b
-log "Model downloaded"
+if command -v ollama &>/dev/null; then
+    info "Pulling huihui_ai/qwen3.5-abliterated:122b (this will take a while ~70GB)..."
+    ollama pull huihui_ai/qwen3.5-abliterated:122b || warn "Model pull failed — retry with: ollama pull huihui_ai/qwen3.5-abliterated:122b"
+    log "Model download attempted"
 
-# Create custom Spectre model with embedded system prompt
-log "Creating Spectre model..."
-cp "$SCRIPT_DIR/configs/ollama/Modelfile" /tmp/Modelfile.spectre
-ollama create spectre -f /tmp/Modelfile.spectre
-rm /tmp/Modelfile.spectre
-log "Spectre model created"
+    # Create custom Spectre model with embedded system prompt
+    log "Creating Spectre model..."
+    cp "$SCRIPT_DIR/configs/ollama/Modelfile" /tmp/Modelfile.spectre
+    ollama create spectre -f /tmp/Modelfile.spectre || warn "Spectre model creation failed"
+    rm -f /tmp/Modelfile.spectre
+    log "Spectre model created"
 
-# Quick test
-info "Testing model..."
-RESPONSE=$(curl -s --max-time 180 http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null) || RESPONSE="TIMEOUT_OR_ERROR"
-if echo "$RESPONSE" | grep -qi "ready"; then
-    log "Model test passed"
+    # Quick test
+    info "Testing model..."
+    RESPONSE=$(curl -s --max-time 180 http://127.0.0.1:11434/api/generate -d '{"model":"spectre","prompt":"Reply with only: READY","stream":false}' 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('response','FAIL'))" 2>/dev/null) || RESPONSE="TIMEOUT_OR_ERROR"
+    if echo "$RESPONSE" | grep -qi "ready"; then
+        log "Model test passed"
+    else
+        warn "Model test returned: $RESPONSE (model may still be loading — this is normal for 122B)"
+    fi
 else
-    warn "Model test returned: $RESPONSE (model may still be loading — this is normal for 122B)"
+    warn "Ollama not available — skipping model pull and test. Install manually: curl -fsSL https://ollama.ai/install.sh | sh"
 fi
 
 # =============================================================
@@ -316,7 +326,7 @@ fi
 # =============================================================
 log "Installing OpenClaw..."
 if ! command -v openclaw &>/dev/null; then
-    npm install -g openclaw 2>/dev/null || warn "OpenClaw npm install failed — install manually"
+    npm install -g openclaw || warn "OpenClaw npm install failed — install manually"
 fi
 
 # Workspace
@@ -324,21 +334,17 @@ WORKSPACE_DIR="/root/.openclaw/workspace"
 mkdir -p "$WORKSPACE_DIR/scripts" "$WORKSPACE_DIR/engagements" "$WORKSPACE_DIR/wordlists" "$WORKSPACE_DIR/memory"
 mkdir -p /root/.openclaw
 
-cp "$SCRIPT_DIR/workspace/SOUL.md" "$WORKSPACE_DIR/"
-cp "$SCRIPT_DIR/workspace/IDENTITY.md" "$WORKSPACE_DIR/"
-cp "$SCRIPT_DIR/workspace/AGENTS.md" "$WORKSPACE_DIR/"
-cp "$SCRIPT_DIR/workspace/TOOLS.md" "$WORKSPACE_DIR/"
-cp "$SCRIPT_DIR/workspace/USER.md" "$WORKSPACE_DIR/"
-cp "$SCRIPT_DIR/workspace/scripts/"*.sh "$WORKSPACE_DIR/scripts/"
-chmod +x "$WORKSPACE_DIR/scripts/"*.sh
+cp "$SCRIPT_DIR/workspace/SOUL.md" "$WORKSPACE_DIR/" 2>/dev/null || true
+cp "$SCRIPT_DIR/workspace/IDENTITY.md" "$WORKSPACE_DIR/" 2>/dev/null || true
+cp "$SCRIPT_DIR/workspace/AGENTS.md" "$WORKSPACE_DIR/" 2>/dev/null || true
+cp "$SCRIPT_DIR/workspace/TOOLS.md" "$WORKSPACE_DIR/" 2>/dev/null || true
+cp "$SCRIPT_DIR/workspace/USER.md" "$WORKSPACE_DIR/" 2>/dev/null || true
+cp "$SCRIPT_DIR/workspace/scripts/"*.sh "$WORKSPACE_DIR/scripts/" 2>/dev/null || true
+chmod +x "$WORKSPACE_DIR/scripts/"*.sh 2>/dev/null || true
 
-# Config — replace placeholders
-cp "$SCRIPT_DIR/configs/openclaw.json" /root/.openclaw/openclaw.json
-sed -i "s/__PASSWORD__/$DASHBOARD_PASSWORD/g" /root/.openclaw/openclaw.json
-sed -i "s/__TOKEN__/$GATEWAY_TOKEN/g" /root/.openclaw/openclaw.json
-sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
-
-cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json
+# Config — will be deployed AFTER onboard (step 15) to avoid being overwritten
+# Just copy exec-approvals now (not touched by onboard)
+cp "$SCRIPT_DIR/configs/exec-approvals.json" /root/.openclaw/exec-approvals.json 2>/dev/null || true
 
 # Set OLLAMA_API_KEY and Go paths globally
 export OLLAMA_API_KEY="ollama-local"
@@ -367,8 +373,8 @@ chown caddy:caddy "$CERT_DIR"/*.pem 2>/dev/null || chmod 644 "$CERT_DIR"/*.pem
 chmod 640 "$CERT_DIR"/*.pem 2>/dev/null || true
 
 # Deploy Caddyfile with token
-cp "$SCRIPT_DIR/configs/caddy/Caddyfile" /etc/caddy/Caddyfile
-sed -i "s/__TOKEN__/$GATEWAY_TOKEN/g" /etc/caddy/Caddyfile
+cp "$SCRIPT_DIR/configs/caddy/Caddyfile" /etc/caddy/Caddyfile 2>/dev/null || warn "Caddyfile copy failed"
+[ -f /etc/caddy/Caddyfile ] && sed -i "s/__TOKEN__/$GATEWAY_TOKEN/g" /etc/caddy/Caddyfile
 
 if [ "$HAS_SYSTEMD" = true ]; then
     systemctl enable caddy 2>/dev/null || true
@@ -389,7 +395,7 @@ DASHBOARD_URL="https://$VPS_IP/"
 # 13. CLAUDE CLI
 # =============================================================
 log "Installing Claude CLI..."
-npm install -g @anthropic-ai/claude-code 2>/dev/null || warn "Claude CLI install failed"
+npm install -g @anthropic-ai/claude-code || warn "Claude CLI install failed"
 
 # Create the 'start' command
 cp "$SCRIPT_DIR/start-context.md" /root/.spectre-context.md
@@ -514,13 +520,44 @@ PROFILEEOF
 fi
 
 # =============================================================
-# 15. OPENCLAW ONBOARD + CONFIGURATION (interactive — runs last)
+# 15. OPENCLAW ONBOARD + CONFIGURATION (non-interactive)
 # =============================================================
-# onboard and doctor run here so their interactive prompts don't
-# block the rest of the installation.
-log "Initializing OpenClaw (interactive setup)..."
-openclaw onboard --accept-risk 2>/dev/null || true
-openclaw doctor --fix 2>/dev/null || true
+# Use --non-interactive with all required flags to avoid the
+# interactive wizard dialog that blocks the rest of installation.
+log "Initializing OpenClaw (non-interactive setup)..."
+if command -v openclaw &>/dev/null; then
+    openclaw onboard \
+        --non-interactive \
+        --accept-risk \
+        --mode local \
+        --flow quickstart \
+        --auth-choice ollama \
+        --gateway-auth password \
+        --gateway-password "$DASHBOARD_PASSWORD" \
+        --gateway-token "$GATEWAY_TOKEN" \
+        --gateway-port 18790 \
+        --gateway-bind lan \
+        --workspace /root/.openclaw/workspace \
+        --skip-channels \
+        --skip-skills \
+        --skip-search \
+        --skip-daemon \
+        --skip-health \
+        --skip-ui \
+        2>/dev/null || warn "openclaw onboard failed — will configure manually"
+    openclaw doctor --fix 2>/dev/null || true
+else
+    warn "OpenClaw not installed — skipping onboard"
+fi
+
+# Deploy our pre-built openclaw.json AFTER onboard/doctor to avoid being overwritten
+log "Deploying pre-built OpenClaw config (overrides onboard defaults)..."
+cp "$SCRIPT_DIR/configs/openclaw.json" /root/.openclaw/openclaw.json 2>/dev/null || warn "openclaw.json template copy failed"
+if [ -f /root/.openclaw/openclaw.json ]; then
+    sed -i "s/__PASSWORD__/$DASHBOARD_PASSWORD/g" /root/.openclaw/openclaw.json
+    sed -i "s/__TOKEN__/$GATEWAY_TOKEN/g" /root/.openclaw/openclaw.json
+    sed -i "s/__VPS_IP__/$VPS_IP/g" /root/.openclaw/openclaw.json
+fi
 
 # Configure provider AFTER doctor (doctor auto-detects ollama and
 # overwrites models.json — we re-write it with our config).
@@ -588,7 +625,7 @@ SKILLS="auto-security-audit pentest-api-attacker pentest-auth-bypass sql-injecti
 for skill in $SKILLS; do
     if [ ! -d "/root/.openclaw/workspace/skills/$skill" ]; then
         npx clawhub@latest install "$skill" --force 2>/dev/null && \
-            log "Skill $skill installed" || warn "Skill $skill failed"
+            log "Skill $skill installed" || { warn "Skill $skill failed"; true; }
         sleep 2
     else
         log "Skill $skill already installed"
@@ -601,23 +638,27 @@ log "ClawHub skills installed"
 # =============================================================
 log "Starting OpenClaw gateway..."
 
-if [ "$HAS_SYSTEMD" = true ]; then
-    mkdir -p /root/.config/systemd/user
-    cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/
-    loginctl enable-linger root 2>/dev/null || true
-    export XDG_RUNTIME_DIR=/run/user/0
-    systemctl --user daemon-reload
-    systemctl --user enable openclaw-gateway
-    systemctl --user start openclaw-gateway
-else
-    # Container mode: start gateway directly in background
-    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
-    sleep 3
-    if curl -s http://127.0.0.1:18790 &>/dev/null; then
-        log "OpenClaw gateway running (direct mode)"
+if command -v openclaw &>/dev/null; then
+    if [ "$HAS_SYSTEMD" = true ]; then
+        mkdir -p /root/.config/systemd/user
+        cp "$SCRIPT_DIR/configs/systemd/openclaw-gateway.service" /root/.config/systemd/user/ 2>/dev/null || true
+        loginctl enable-linger root 2>/dev/null || true
+        export XDG_RUNTIME_DIR=/run/user/0
+        systemctl --user daemon-reload 2>/dev/null || true
+        systemctl --user enable openclaw-gateway 2>/dev/null || true
+        systemctl --user start openclaw-gateway 2>/dev/null || true
     else
-        warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
+        # Container mode: start gateway directly in background
+        OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+        sleep 3
+        if curl -s http://127.0.0.1:18790 &>/dev/null; then
+            log "OpenClaw gateway running (direct mode)"
+        else
+            warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
+        fi
     fi
+else
+    warn "OpenClaw not installed — skipping gateway start"
 fi
 
 log "OpenClaw gateway started"
@@ -654,8 +695,8 @@ fi
 # =============================================================
 log "Setting up OpenClaw watchdog..."
 
-cp "$SCRIPT_DIR/scripts/openclaw-watchdog.sh" /usr/local/bin/openclaw-watchdog
-chmod +x /usr/local/bin/openclaw-watchdog
+cp "$SCRIPT_DIR/scripts/openclaw-watchdog.sh" /usr/local/bin/openclaw-watchdog 2>/dev/null || warn "Watchdog script copy failed"
+chmod +x /usr/local/bin/openclaw-watchdog 2>/dev/null || true
 touch /var/log/openclaw-watchdog.log
 
 if [ "$HAS_SYSTEMD" = true ]; then
