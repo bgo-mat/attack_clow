@@ -23,11 +23,11 @@
 | 012 | Agent spécialisé AD (spectre-ad) | P1 | [x] Done |
 | 013 | Agent spécialisé Network (spectre-network) | P2 | [x] Done |
 | 014 | Agent spécialisé RE (spectre-re) | P2 | [x] Done |
-| 015 | Mécanisme de délégation dans SOUL.md | P1 | [ ] TODO |
+| 015 | Mécanisme de délégation dans SOUL.md | P1 | [x] Done |
 | 016 | Test d'intégration complet | P2 | [ ] TODO |
-| 017 | Optimisation du watchdog v2 | P3 | [ ] TODO |
+| 017 | Optimisation du watchdog v2 | P3 | [x] Done |
 
-**Progression : 14/17 (82%)**
+**Progression : 16/17 (94%)**
 
 ---
 

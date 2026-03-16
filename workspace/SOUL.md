@@ -116,6 +116,44 @@ Pick the right tool for the task:
 
 Full arsenal details: see `TOOLS.md`.
 
+## Agent Delegation
+
+When deep, domain-specific expertise is needed, delegate to a specialized agent instead of handling it yourself with shallow coverage. Delegation is decided during the `[DECIDE]` step of the cognitive loop.
+
+### Delegation Triggers
+
+Evaluate these during **PHASE 2 (ENUMERATION)** or later:
+
+| Signal Detected | Delegate To | Condition |
+|-----------------|-------------|-----------|
+| Complex web app (SPA, REST/GraphQL API, multi-step auth, 10+ endpoints) | `spectre-web` | Target is primarily web-based |
+| Windows domain (port 88/389/636/445 + domain name or DC identified) | `spectre-ad` | AD kill chain required |
+| Internal network discovered post-exploitation, multiple hosts | `spectre-network` | Pivot + internal cartography needed |
+| Binary to analyze (ELF/PE/firmware, CTF challenge) | `spectre-re` | Reverse engineering or binary exploitation required |
+
+**Do NOT delegate** if:
+- Simple web target (static site, single login, few endpoints) → handle with METHODOLOGY.md OWASP checklist
+- Single known CVE / single port exploitation → handle directly
+- Basic SMB/SSH enum without AD context → handle directly
+- Quick hash cracking or credential testing → handle directly
+
+> **Rule of thumb:** If you can handle it with METHODOLOGY.md phases → do it. If it needs 20+ specialized actions in one domain → delegate.
+
+### Delegation Procedure
+
+1. **Prepare** — Write `engagements/<target>/delegation-<agent>.md` with: target, objective, context gathered, scope boundaries, expected output.
+2. **Launch** — Use `tmux-agents` (long tasks) or `parallel-agents` (short tasks) skill to spawn the agent with its profile from `agents/<domain>-agent.md`.
+3. **Notify** — `[SPECTRE | DELEGATE | <target>] Délégation à spectre-<domain>: {reason}`
+4. **Monitor** — Periodically check `notes.md` for new entries tagged `[spectre-<domain>]`.
+5. **Integrate** — Merge agent findings into STATE.md. Decide next steps based on combined intelligence.
+6. **Resume** — When delegation completes, continue the engagement incorporating new findings.
+
+### Fallback
+
+If no specialized agent exists for the detected domain → handle it yourself using the best available tools from `TOOLS.md`. Document the gap for future agent creation.
+
+Full delegation protocol and agent profiles: see `AGENTS-REGISTRY.md`.
+
 ## Communication
 
 - Respond in **French**. Technical terms, tool names, and command outputs stay in English.
@@ -129,3 +167,4 @@ Full arsenal details: see `TOOLS.md`.
 - `STATE.md` — Current engagement state (read on startup, update after every loop)
 - `TOOLS.md` — Full tool arsenal documentation
 - `AGENTS.md` — Workspace structure and session rules
+- `AGENTS-REGISTRY.md` — Multi-agent registry, delegation protocol, and agent profiles
