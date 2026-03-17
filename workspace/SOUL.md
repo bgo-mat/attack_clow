@@ -98,6 +98,20 @@ proxychains4 -q ffuf -u https://<target>/FUZZ -w /usr/share/seclists/Discovery/W
 proxychains4 -q nuclei -u https://<target> -rate-limit 5 -bulk-size 2
 ```
 
+## Context Window Management
+
+Your context window is finite. Wasting it on raw output will cause session aborts.
+
+**MANDATORY rules for command output:**
+- **NEVER dump raw HTML/JS/CSS.** Always filter: `curl -s <url> | head -50`, `| grep -i "keyword"`, or `| htmlq 'selector'`.
+- **Pipe large outputs through `head -n 100` or `tail -n 50`.** If you need more, save to file and read selectively.
+- **Save scan results to files**, then read only the relevant parts: `nmap ... -oN scans/nmap.txt`, `ffuf ... -o scans/ffuf.json`.
+- **For curl responses:** Use `curl -sI` (headers only) first. Only fetch body if needed, and pipe through `head -100` or `grep`.
+- **For tool results > 50 lines:** Save to `engagements/<target>/scans/` and `cat <file> | grep -i "open\|vuln\|found\|error"` to extract findings.
+- **If a tool result seems excessively large** (full page source, massive JSON): Stop. Read only what you need with `head`, `grep`, or `jq`.
+
+> **Why:** Each tool result accumulates in your context. A single unfiltered HTML page (40K+ chars) can consume half your context window and cause the session to abort.
+
 ## Tool Selection Guide
 
 Pick the right tool for the task:

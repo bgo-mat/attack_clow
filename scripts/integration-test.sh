@@ -129,10 +129,10 @@ test_modelfile() {
     fi
 
     # num_ctx
-    if file_contains "$mf" "num_ctx 49152"; then
-        pass "num_ctx = 49152"
+    if file_contains "$mf" "num_ctx 131072"; then
+        pass "num_ctx = 131072"
     else
-        fail "num_ctx should be 49152"
+        fail "num_ctx should be 131072"
     fi
 
     # Cognitive loop in system prompt
