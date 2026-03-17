@@ -284,9 +284,20 @@ for i in $(seq 1 15); do
 done
 
 if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
-    # No systemd or service failed — start manually
-    info "Starting Ollama manually..."
-    ollama serve &>/dev/null &
+    if [ "$HAS_SYSTEMD" = true ]; then
+        systemctl enable ollama 2>/dev/null || true
+        systemctl start ollama 2>/dev/null || true
+    else
+        # Container mode: install supervisor config for auto-restart
+        info "Installing Ollama supervisor config..."
+        cp "$SCRIPT_DIR/configs/supervisor/ollama.sh" /opt/supervisor-scripts/ollama.sh 2>/dev/null || true
+        chmod +x /opt/supervisor-scripts/ollama.sh 2>/dev/null || true
+        cp "$SCRIPT_DIR/configs/supervisor/ollama.conf" /etc/supervisor/conf.d/ollama.conf 2>/dev/null || true
+        supervisorctl reread 2>/dev/null && supervisorctl update 2>/dev/null || {
+            info "Supervisor not available — starting Ollama manually..."
+            ollama serve &>/dev/null &
+        }
+    fi
     sleep 5
 fi
 
@@ -433,30 +444,39 @@ else
     echo "[+] Tor already running"
 fi
 
-# Ollama
-if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
-    ollama serve &>/dev/null &
+# Ollama + OpenClaw Gateway (via supervisor if available)
+if command -v supervisorctl &>/dev/null; then
+    # Install supervisor configs if not present
+    if [ ! -f /etc/supervisor/conf.d/ollama.conf ]; then
+        cp "$SCRIPT_DIR/configs/supervisor/ollama.sh" /opt/supervisor-scripts/ollama.sh 2>/dev/null || true
+        cp "$SCRIPT_DIR/configs/supervisor/ollama.conf" /etc/supervisor/conf.d/ollama.conf 2>/dev/null || true
+        chmod +x /opt/supervisor-scripts/ollama.sh 2>/dev/null || true
+    fi
+    if [ ! -f /etc/supervisor/conf.d/openclaw-gateway.conf ]; then
+        cp "$SCRIPT_DIR/configs/supervisor/openclaw-gateway.sh" /opt/supervisor-scripts/openclaw-gateway.sh 2>/dev/null || true
+        cp "$SCRIPT_DIR/configs/supervisor/openclaw-gateway.conf" /etc/supervisor/conf.d/openclaw-gateway.conf 2>/dev/null || true
+        chmod +x /opt/supervisor-scripts/openclaw-gateway.sh 2>/dev/null || true
+    fi
+    supervisorctl reread 2>/dev/null && supervisorctl update 2>/dev/null
     sleep 5
-    echo "[+] Ollama started"
+    supervisorctl status ollama 2>/dev/null | grep -q RUNNING && echo "[+] Ollama started (supervisor)" || echo "[!] Ollama failed to start via supervisor"
+    supervisorctl status openclaw-gateway 2>/dev/null | grep -q RUNNING && echo "[+] OpenClaw gateway started (supervisor)" || echo "[!] Gateway failed to start via supervisor"
 else
-    echo "[+] Ollama already running"
-fi
-
-# Caddy
-if ! pgrep -x caddy &>/dev/null; then
-    caddy start --config /etc/caddy/Caddyfile
-    echo "[+] Caddy started"
-else
-    echo "[+] Caddy already running"
-fi
-
-# OpenClaw Gateway
-if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
-    OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
-    sleep 3
-    echo "[+] OpenClaw gateway started"
-else
-    echo "[+] OpenClaw gateway already running"
+    # Fallback: manual background processes
+    if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
+        ollama serve &>/dev/null &
+        sleep 5
+        echo "[+] Ollama started (manual)"
+    else
+        echo "[+] Ollama already running"
+    fi
+    if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
+        OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+        sleep 3
+        echo "[+] OpenClaw gateway started (manual)"
+    else
+        echo "[+] OpenClaw gateway already running"
+    fi
 fi
 
 # Cloudflare tunnel (Vast.ai)
@@ -648,11 +668,26 @@ if command -v openclaw &>/dev/null; then
         systemctl --user enable openclaw-gateway 2>/dev/null || true
         systemctl --user start openclaw-gateway 2>/dev/null || true
     else
-        # Container mode: start gateway directly in background
-        OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
-        sleep 3
+        # Container mode: use supervisor if available for auto-restart
+        if command -v supervisorctl &>/dev/null; then
+            cp "$SCRIPT_DIR/configs/supervisor/openclaw-gateway.sh" /opt/supervisor-scripts/openclaw-gateway.sh 2>/dev/null || true
+            cp "$SCRIPT_DIR/configs/supervisor/openclaw-gateway.conf" /etc/supervisor/conf.d/openclaw-gateway.conf 2>/dev/null || true
+            chmod +x /opt/supervisor-scripts/openclaw-gateway.sh 2>/dev/null || true
+            supervisorctl reread 2>/dev/null && supervisorctl update 2>/dev/null
+            sleep 5
+            if supervisorctl status openclaw-gateway 2>/dev/null | grep -q RUNNING; then
+                log "OpenClaw gateway running (supervisor)"
+            else
+                warn "OpenClaw gateway failed via supervisor — starting manually"
+                OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+                sleep 3
+            fi
+        else
+            OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+            sleep 3
+        fi
         if curl -s http://127.0.0.1:18790 &>/dev/null; then
-            log "OpenClaw gateway running (direct mode)"
+            log "OpenClaw gateway running"
         else
             warn "OpenClaw gateway may not have started — run 'openclaw gateway --port 18790 &' manually"
         fi

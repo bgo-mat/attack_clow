@@ -67,13 +67,17 @@ PHASE 6: REPORTING
 ### 1B: Active Recon
 | Action | Tool | Command pattern |
 |--------|------|-----------------|
-| Port scan (stealth) | nmap | `proxychains4 -q nmap -sT -T2 --scan-delay 1s --randomize-hosts --data-length 50 -Pn <target>` |
+| Port scan (stealth) | nmap | `proxychains4 -q nmap -sT -T2 --scan-delay 1s --randomize-hosts --data-length 50 -Pn --top-ports 1000 <target>` |
 | Service/version detection | nmap | `proxychains4 -q nmap -sV -T2 -p<ports> <target>` |
 | Web server vulns | nikto | `proxychains4 -q nikto -h <target> -Pause 1` |
 
 > **IMPORTANT:** Through Tor/proxychains, only TCP connect scans (-sT) work.
 > SYN scans (-sS), UDP scans (-sU), and OS detection (-O) require raw sockets
 > and WILL FAIL silently through SOCKS proxies. NEVER attempt -sS via proxychains.
+>
+> **PERFORMANCE:** Always start with `--top-ports 1000` through Tor. A full `-p-`
+> (65535 ports) scan via proxychains takes hours and may cause timeouts. Only use
+> `-p-` as a second pass if initial recon finds nothing interesting.
 
 **Exit criteria:** Subdomains listed, open ports/services identified, tech stack known, WAF status known.
 **Transition:** → PHASE 2
