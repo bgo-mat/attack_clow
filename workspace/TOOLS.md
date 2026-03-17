@@ -81,10 +81,50 @@
 - **subfinder** — Subdomains may point to real IP (check A records with `dig`)
 - **SecurityTrails / Censys** — Historical DNS records (manual/API)
 
+## Output Parsing & Formatting (CRITICAL — use these to avoid context overflow)
+
+### HTML / Web Response Parsing
+- **htmlq** — `/usr/local/bin/htmlq` — CSS selectors on HTML (like jq for HTML). Extract links, forms, scripts, meta tags without dumping raw HTML
+  - Links: `curl -s <url> | htmlq 'a' -a href`
+  - Forms + hidden fields: `curl -s <url> | htmlq 'form' -a action` / `htmlq 'input[type=hidden]' -a value`
+  - Title + generator: `curl -s <url> | htmlq 'title' -t` / `htmlq 'meta[name=generator]' -a content`
+  - Script sources: `curl -s <url> | htmlq 'script[src]' -a src`
+  - Strip tags, get text only: `curl -s <url> | htmlq -t 'body'`
+- **html2text** — `html2text` — Convert HTML to readable Markdown-like text. Preserves links and structure, strips all tags
+  - `curl -s <url> | html2text | head -100`
+- **BeautifulSoup + lxml** — Python HTML/XML parser. Use for complex extractions (comments, inline JS, nested structures)
+  - `python3 -c "from bs4 import BeautifulSoup, Comment; soup=BeautifulSoup(open('page.html'),'lxml'); [print(c.strip()) for c in soup.find_all(string=lambda t: isinstance(t, Comment))]"`
+
+### Structured Data Parsing
+- **jq** — `/usr/bin/jq` — JSON processor. Parse ffuf JSON, nuclei JSON, API responses
+  - ffuf results: `jq -r '.results[] | select(.status==200) | "\(.status) \(.length)B \(.url)"' results.json`
+  - Filter sensitive: `jq -r '.results[] | select(.input.FUZZ | test("env|config|backup")) | .url' results.json`
+- **xq** — XML processor (like jq for XML). Parse nmap XML output
+  - Open ports: `cat scan.xml | xq -r '.nmaprun.host.ports.port[] | select(.state["@state"]=="open") | "\(.["@portid"]) \(.service["@name"]) \(.service["@product"]//"-") \(.service["@version"]//"-")"'`
+- **yq** — YAML processor. Parse config files, Kubernetes manifests
+  - `cat config.yaml | yq -r '.database.url'`
+
+### CSV / Tabular Data
+- **csvkit** — CSV toolkit: csvgrep, csvcut, csvsql, csvlook. Parse ffuf CSV, scan exports
+  - Filter sensitive findings: `csvgrep -c FUZZ -r "env|config|backup" results.csv | csvcut -c FUZZ,url,status | csvlook`
+  - SQL queries on CSV: `csvsql --query "SELECT url,status,length FROM 'results' WHERE status=200 ORDER BY length DESC" results.csv`
+- **mlr (miller)** — `/usr/local/bin/mlr` — CSV/JSON/tabular Swiss army knife
+  - Filter + format: `mlr --icsv --opprint filter '$status == 200' then cut -f FUZZ,status,length results.csv`
+
+### Search & Pattern Matching
+- **rg (ripgrep)** — `/usr/local/bin/rg` — Ultra-fast recursive grep with better regex
+  - Find secrets in files: `rg -in "api.key|password|secret|token|mysql://|sk-live" /path/`
+  - Search with context: `rg -C3 "admin" scan-output.txt`
+
+### Python Libraries (for one-liners and scripts)
+- **beautifulsoup4** + **lxml** — HTML/XML parsing with CSS selectors and XPath
+- **html2text** — HTML to Markdown conversion
+- **rich** — Pretty-print tables, JSON, and formatted output in terminal
+
 ## Utilities
 - **curl** — HTTP client (use `--socks5-hostname 127.0.0.1:9050` for Tor)
 - **httpie** — Human-friendly HTTP client
-- **jq** — JSON processor
+- **jq** — JSON processor (see Output Parsing section for examples)
 - **tmux** — Terminal multiplexer for persistent sessions
 - **python3-pip** — Python package manager
 

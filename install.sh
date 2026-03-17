@@ -164,11 +164,29 @@ curl -sL https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.s
 curl -sL https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASx64.exe -o /opt/peass/winpeas.exe
 log "LinPEAS/WinPEAS installed"
 
+# Output parsing binaries (htmlq, ripgrep, miller)
+if ! command -v htmlq &>/dev/null; then
+    curl -sL https://github.com/mgdm/htmlq/releases/download/v0.4.0/htmlq-x86_64-linux.tar.gz | tar xz -C /usr/local/bin/ 2>/dev/null && \
+        log "htmlq installed" || warn "htmlq install failed"
+fi
+if ! command -v rg &>/dev/null; then
+    curl -sL https://github.com/BurntSushi/ripgrep/releases/download/14.1.1/ripgrep-14.1.1-x86_64-unknown-linux-musl.tar.gz | \
+        tar xz --strip-components=1 -C /usr/local/bin/ ripgrep-14.1.1-x86_64-unknown-linux-musl/rg 2>/dev/null && \
+        log "ripgrep installed" || warn "ripgrep install failed"
+fi
+if ! command -v mlr &>/dev/null; then
+    curl -sL https://github.com/johnkerl/miller/releases/download/v6.13.0/miller-6.13.0-linux-amd64.tar.gz | \
+        tar xz --strip-components=1 -C /usr/local/bin/ miller-6.13.0-linux-amd64/mlr 2>/dev/null && \
+        log "miller installed" || warn "miller install failed"
+fi
+
 # =============================================================
 # 4. PIP TOOLS
 # =============================================================
 log "Installing pip tools..."
 pip3 install --break-system-packages wafw00f commix arjun impacket 2>/dev/null || warn "Some pip tools failed"
+log "Installing output parsing tools..."
+pip3 install --break-system-packages beautifulsoup4 lxml html2text yq csvkit rich 2>/dev/null || warn "Some parsing tools failed"
 pip3 install --break-system-packages pipx 2>/dev/null && pipx install git+https://github.com/Pennyw0rth/NetExec.git 2>/dev/null || warn "NetExec install failed"
 # Symlink pipx tools
 for bin in /root/.local/bin/*; do

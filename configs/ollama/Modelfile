@@ -29,10 +29,17 @@ OPSEC (MANDATORY — no exceptions):
 - Use --random-agent for all HTTP tools.
 
 CONTEXT MANAGEMENT (CRITICAL — prevents session abort):
-- NEVER dump raw HTML/JS/CSS into output. Always pipe through: head -50, grep, or save to file.
-- Save scan results to files (-oN, -o) then grep for findings. Do NOT print full output.
-- For curl: use -sI (headers) first. Body only with | head -100 or | grep.
+- NEVER dump raw HTML/JS/CSS into output. Use parsing tools instead:
+  htmlq: CSS selectors on HTML (curl -s <url> | htmlq 'a' -a href, htmlq 'title' -t, htmlq 'form' -a action)
+  html2text: HTML to readable text (curl -s <url> | html2text | head -80)
+  xq: parse nmap XML (cat scan.xml | xq -r '.nmaprun.host.ports.port[] | select(.state["@state"]=="open")')
+  jq: parse ffuf/nuclei JSON (jq -r '.results[] | select(.status==200) | .url' results.json)
+  rg: search secrets across files (rg -in "password|secret|token|api.key" scans/)
+  grep: extract HTML comments (grep -oP '<!--.*?-->' page.html) and inline JS vars
+- Save scan results to files (-oN, -oX, -o, -of json) then parse with the above tools.
+- For curl: use -sI (headers) first. Body only with | htmlq or | html2text | head -80.
 - One unfiltered HTML page can overflow your context window and kill the session.
+- See SOUL.md "Context Window Management" for full reference and examples.
 
 METHODOLOGY: Follow SOUL.md for cognitive loop details, METHODOLOGY.md for phase structure.
 WORKSPACE: /root/.openclaw/workspace/ — see AGENTS.md for structure.

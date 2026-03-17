@@ -103,14 +103,80 @@ proxychains4 -q nuclei -u https://<target> -rate-limit 5 -bulk-size 2
 Your context window is finite. Wasting it on raw output will cause session aborts.
 
 **MANDATORY rules for command output:**
-- **NEVER dump raw HTML/JS/CSS.** Always filter: `curl -s <url> | head -50`, `| grep -i "keyword"`, or `| htmlq 'selector'`.
+- **NEVER dump raw HTML/JS/CSS.** Use parsing tools instead (see examples below).
 - **Pipe large outputs through `head -n 100` or `tail -n 50`.** If you need more, save to file and read selectively.
-- **Save scan results to files**, then read only the relevant parts: `nmap ... -oN scans/nmap.txt`, `ffuf ... -o scans/ffuf.json`.
-- **For curl responses:** Use `curl -sI` (headers only) first. Only fetch body if needed, and pipe through `head -100` or `grep`.
-- **For tool results > 50 lines:** Save to `engagements/<target>/scans/` and `cat <file> | grep -i "open\|vuln\|found\|error"` to extract findings.
-- **If a tool result seems excessively large** (full page source, massive JSON): Stop. Read only what you need with `head`, `grep`, or `jq`.
+- **Save scan results to files**, then read only the relevant parts: `nmap ... -oN scans/nmap.txt -oX scans/nmap.xml`, `ffuf ... -o scans/ffuf.json`.
+- **For curl responses:** Use `curl -sI` (headers only) first. Only fetch body if needed, and always parse it.
+- **For tool results > 50 lines:** Save to `engagements/<target>/scans/` and extract findings with the right parser.
+- **If a tool result seems excessively large** (full page source, massive JSON): Stop. Read only what you need.
 
 > **Why:** Each tool result accumulates in your context. A single unfiltered HTML page (40K+ chars) can consume half your context window and cause the session to abort.
+
+### How to parse web responses (instead of dumping raw HTML)
+
+**Extract specific elements with `htmlq`** (CSS selectors, like jq for HTML):
+```bash
+# Links, forms, hidden fields, scripts, title, meta
+curl -s <url> | htmlq 'a' -a href
+curl -s <url> | htmlq 'form' -a action
+curl -s <url> | htmlq 'input[type=hidden]' -a value
+curl -s <url> | htmlq 'title' -t
+curl -s <url> | htmlq 'meta[name=generator]' -a content
+curl -s <url> | htmlq 'script[src]' -a src
+```
+
+**Convert HTML to readable text with `html2text`**:
+```bash
+curl -s <url> | html2text | head -80
+```
+
+**Extract comments and inline JS secrets with `grep`** (htmlq does not parse comments):
+```bash
+curl -s <url> | grep -oP '<!--.*?-->'
+curl -s <url> | grep -oP '(?:var|let|const)\s+\w+\s*=\s*"[^"]*"'
+```
+
+**For deep extraction, use Python + BeautifulSoup**:
+```bash
+curl -s <url> -o /tmp/page.html
+python3 -c "
+from bs4 import BeautifulSoup, Comment
+soup = BeautifulSoup(open('/tmp/page.html'), 'lxml')
+print('TITLE:', soup.title.string if soup.title else '-')
+print('LINKS:', [a['href'] for a in soup.find_all('a', href=True)])
+print('FORMS:', [(f.get('action'), f.get('method')) for f in soup.find_all('form')])
+print('COMMENTS:', [c.strip() for c in soup.find_all(string=lambda t: isinstance(t, Comment))])
+print('SCRIPTS:', [s['src'] for s in soup.find_all('script', src=True)])
+"
+```
+
+### How to parse scan outputs
+
+**nmap XML** → use `xq` (saves context vs reading raw text):
+```bash
+# Save as XML, then extract open ports
+proxychains4 -q nmap -sT -T2 -Pn --top-ports 1000 <target> -oX scans/nmap.xml -oN scans/nmap.txt
+cat scans/nmap.xml | xq -r '.nmaprun.host.ports.port[] | select(.state["@state"]=="open") | "\(.["@portid"]) \(.service["@name"]) \(.service["@product"]//"-") \(.service["@version"]//"-")"'
+```
+
+**ffuf JSON** → use `jq`:
+```bash
+proxychains4 -q ffuf -u https://<target>/FUZZ -w <wordlist> -rate 10 -o scans/ffuf.json -of json
+# Show 200s sorted by size
+jq -r '.results[] | select(.status==200) | "\(.status) \(.length)B \(.url)"' scans/ffuf.json | sort -t' ' -k2 -rn
+# Flag sensitive files
+jq -r '.results[] | select(.status==200 and (.input.FUZZ | test("env|config|backup|secret|debug"))) | .url' scans/ffuf.json
+```
+
+**ffuf CSV** → use `csvkit`:
+```bash
+csvgrep -c FUZZ -r "env|config|backup" scans/ffuf.csv | csvcut -c FUZZ,url,status | csvlook
+```
+
+**Search for secrets across saved files** → use `rg` (ripgrep):
+```bash
+rg -in "api.key|password|secret|token|mysql://|sk-live|aws_access" engagements/<target>/scans/
+```
 
 ## Tool Selection Guide
 
