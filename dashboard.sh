@@ -15,11 +15,35 @@ err()  { echo -e "${RED}[-]${NC} $1"; exit 1; }
 info() { echo -e "${CYAN}[*]${NC} $1"; }
 
 # =============================================================
-# 1. CHECK SERVICES
+# 1. CHECK SERVICES (use supervisor if available)
 # =============================================================
+HAS_SUPERVISOR=false
+command -v supervisorctl &>/dev/null && HAS_SUPERVISOR=true
+
+if ! curl -s http://127.0.0.1:11434/api/tags &>/dev/null; then
+    warn "Ollama not running — starting..."
+    if [ "$HAS_SUPERVISOR" = true ]; then
+        supervisorctl start ollama 2>/dev/null
+        sleep 5
+    else
+        ollama serve &>/dev/null &
+        sleep 5
+    fi
+fi
+
 if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
-    warn "Gateway not running — starting services..."
-    spectre-start-all 2>/dev/null || err "Run 'spectre-start-all' first"
+    warn "Gateway not running — starting..."
+    if [ "$HAS_SUPERVISOR" = true ]; then
+        supervisorctl start openclaw-gateway 2>/dev/null
+        sleep 5
+    else
+        OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+        sleep 3
+    fi
+fi
+
+if ! curl -s http://127.0.0.1:18790 &>/dev/null; then
+    err "Gateway still not responding — check logs with: supervisorctl tail openclaw-gateway"
 fi
 
 # =============================================================
@@ -51,10 +75,15 @@ else:
     print('OK')
 " 2>/dev/null | grep -q "UPDATED" && {
             log "Added tunnel to allowedOrigins — restarting gateway..."
-            pkill -f "openclaw gateway" 2>/dev/null
-            sleep 2
-            OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
-            sleep 3
+            if [ "$HAS_SUPERVISOR" = true ]; then
+                supervisorctl restart openclaw-gateway 2>/dev/null
+                sleep 5
+            else
+                pkill -f "openclaw gateway" 2>/dev/null
+                sleep 2
+                OLLAMA_API_KEY="ollama-local" openclaw gateway --port 18790 &>/dev/null &
+                sleep 3
+            fi
         }
     else
         warn "Tunnel creation failed"
@@ -70,12 +99,21 @@ fi
 # =============================================================
 # 3. APPROVE PENDING DEVICES
 # =============================================================
-PENDING=$(openclaw devices list 2>/dev/null | grep -A100 "^Pending" | grep "│" | grep -v "Request\|─" | awk -F'│' '{print $2}' | tr -d ' ' | grep -v '^$')
+DEVICES_OUTPUT=$(openclaw devices list 2>&1)
+
+# Extract pending request IDs (UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+# Only look in the "Pending" section, stop at next section header
+PENDING=$(echo "$DEVICES_OUTPUT" | sed -n '/^Pending/,/^[A-Z]/p' | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | sort -u)
 
 if [ -n "$PENDING" ]; then
     info "Approving pending devices..."
     for req_id in $PENDING; do
-        openclaw devices approve "$req_id" 2>&1 && log "Approved: $req_id" || warn "Failed to approve: $req_id"
+        if openclaw devices approve "$req_id" 2>&1; then
+            log "Approved: $req_id"
+        else
+            warn "Failed to approve: $req_id"
+            break  # Stop on first failure to avoid loop
+        fi
     done
 else
     log "No pending devices"
