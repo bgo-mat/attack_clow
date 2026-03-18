@@ -649,6 +649,7 @@ with open('/root/.openclaw/openclaw.json') as f:
 defaults = cfg.get('agents', {}).get('defaults', {})
 defaults['model'] = {'primary': 'openai-compat/spectre:latest', 'fallbacks': []}
 defaults['models'] = {'openai-compat/spectre:latest': {'alias': 'Spectre (122B uncensored)'}}
+defaults['timeoutSeconds'] = 86400  # 24h — default 600s kills agent with slow local 122B model
 with open('/root/.openclaw/openclaw.json', 'w') as f:
     json.dump(cfg, f, indent=2)
 " || warn "Failed to fix openclaw.json model config"
